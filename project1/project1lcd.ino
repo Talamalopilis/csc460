@@ -84,7 +84,9 @@ void loop()
     lcd.print(tpos);
     lcd.setCursor(0,1);
     lcd.print("LSR ");
-    lcd.print(z ? " ON" : "OFF");
+    lcd.print(!z ? " ON " : "OFF ");
+    lcd.print(ls0);
+    
     Serial.print((int)x, DEC);
     Serial.print(",");
     Serial.print((int)y, DEC);
