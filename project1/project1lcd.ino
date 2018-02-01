@@ -7,8 +7,8 @@ int LIGHT_SENSOR = A3;
 
 int JoyStick_Z = 32;
 int LED_PIN = 13;
-const int panpin = 9;
-int const tiltpin = 10;
+const int panpin = 2;
+int const tiltpin = 3;
 float alpha = 0.5;
 int ppos = 1500;
 int tpos = 1500;
@@ -27,10 +27,10 @@ void setup()
   Serial.begin(9600);
   lcd.begin(16, 2);
   lcd.setCursor(0,0);
-//  pan.attach(panpin);
-//  tilt.attach(tiltpin);
-//  pan.writeMicroseconds(ppos);
-//  tilt.writeMicroseconds(tpos);
+  pan.attach(panpin);
+  tilt.attach(tiltpin);
+  pan.writeMicroseconds(ppos);
+  tilt.writeMicroseconds(tpos);
   delay(200);
 }
 
@@ -47,7 +47,6 @@ void loop()
     z = digitalRead(JoyStick_Z);
     ls0 = analogRead(LIGHT_SENSOR);
 
-    // just use x axis to adjust brightness
     ppos += ((int)x - 509) / 50;
     tpos += ((int)y - 510) / 50;
 
@@ -75,17 +74,17 @@ void loop()
     {
       digitalWrite(38, LOW);
     }
-//    pan.writeMicroseconds(ppos);
-//    tilt.writeMicroseconds(tpos);
+    pan.writeMicroseconds(3000 - ppos);
+    tilt.writeMicroseconds(tpos);
 //    analogWrite(LED_PIN, 0);
     lcd.home();
-    lcd.print(ppos);
+    lcd.print(3000 - ppos);
     lcd.print(" ");
     lcd.print(tpos);
     lcd.setCursor(0,1);
     lcd.print("LSR ");
     lcd.print(!z ? " ON " : "OFF ");
-    lcd.print(ls0);
+    lcd.print(ls0 >= 1000 ? 999 : ls0);
     
     Serial.print((int)x, DEC);
     Serial.print(",");
@@ -99,5 +98,4 @@ void loop()
     Serial.println(ls0, DEC);
     delay(10);
   }
-  //
 }
