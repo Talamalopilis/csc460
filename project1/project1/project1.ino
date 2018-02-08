@@ -11,9 +11,9 @@ int idle_pin = 40;
 byte csbuff[6];
 
 struct controlstate {
-  int ppos:11;
-  int tpos:11;
-  bool laser:1;
+  uint16_t ppos;
+  uint16_t tpos;
+  bool laser;
 };
 
 union btin {
@@ -36,8 +36,27 @@ void initcs() {
 }
 
 void readbt() {
-	if (Serial.available() >= sizeof(controlstate)) {
-		Serial.readBytes(btin.bt,sizeof(controlstate));
+	if (Serial1.available() > sizeof(controlstate)) {
+		while (Serial1.peek() != '$') {
+			if (Serial1.available()) {
+				Serial1.read();
+			}
+			else {
+				return;
+			}
+		};
+		if (Serial1.available() > sizeof(controlstate)) {
+			Serial1.read();
+			Serial1.readBytes(btin.bt, sizeof(controlstate));
+			if (btin.cs.ppos > 2000)
+				btin.cs.ppos = 2000;
+			if (btin.cs.ppos < 1000)
+				btin.cs.ppos = 1000;
+			if (btin.cs.tpos > 2000)
+				btin.cs.tpos = 2000;
+			if (btin.cs.tpos < 1000)
+				btin.cs.tpos = 1000;
+		}
 	}
 }
 
@@ -54,6 +73,7 @@ void setup()
   pinMode(38, OUTPUT);
   pinMode(idle_pin, OUTPUT);
   Serial.begin(9600);
+  Serial1.begin(9600);
   pan.attach(panpin);
   tilt.attach(tiltpin);
   pan.writeMicroseconds(btin.cs.ppos);
@@ -79,6 +99,8 @@ void idle(uint32_t idle_period)
 }
 void loop()
 {
+	Serial.println(btin.cs.ppos);
+	Serial.println(btin.cs.tpos);
 	uint32_t idle_period = Scheduler_Dispatch();
 	if (idle_period)
 	{
