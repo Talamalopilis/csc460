@@ -2,19 +2,25 @@
 #include <LiquidCrystal.h>
 #include "scheduler.h"
 
-const int JoyStick_X = A8;
-const int JoyStick_Y = A9;
+const int JS_SERVO_X = A8;
+const int JS_SERVO_Y = A9;
+const int JS_SERVO_Z = 32;
+
+const int JS_ROOMBA_X = A11;
+const int JS_ROOMBA_Y = A12;
+const int JS_ROOMBA_Z = 33;
+
 const int LIGHT_SENSOR = A10;
-const int JoyStick_Z = 32;
 const int LED_PIN = 13;
-const float alpha = 0.5;
-const int idle_pin = 40;
+const float ALPHA = 0.5;
+const int IDLE_PIN = 40;
 
 uint16_t ls = 0;
 
 struct controlstate {
   uint16_t ppos;
   uint16_t tpos;
+  char rcom;
   bool laser;
 };
 
@@ -24,11 +30,12 @@ union Data {
 };
 
 struct joyvals {
-  float x, y;
+  int x, y;
   int z;
 };
 
-struct joyvals j;
+struct joyvals js_servo;
+struct joyvals js_roomba;
 union Data data;
 LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 void getjoystick();
@@ -36,14 +43,19 @@ void getlightsensor();
 void printlcd();
 
 void getjoystick() {
-  j.x = analogRead(JoyStick_X);
-  j.y = analogRead(JoyStick_Y);
-  j.z = digitalRead(JoyStick_Z);
+  js_servo.x = analogRead(JS_SERVO_X);
+  js_servo.y = analogRead(JS_SERVO_Y);
+  js_servo.z = digitalRead(JS_SERVO_Z);
+
+  js_roomba.x = analogRead(JS_ROOMBA_X);
+  js_roomba.y = analogRead(JS_ROOMBA_Y);
+  js_roomba.z = digitalRead(JS_ROOMBA_Z);
+
   int ppos = data.cs.ppos;
   int tpos = data.cs.tpos;
 
-  ppos += ((int)j.x - 509) / 75;
-  tpos += ((int)j.y - 510) / 75;
+  ppos += (js_servo.x - 509) / 50;
+  tpos += (js_servo.y - 510) / 50;
 
   if (ppos > 2000)
   {
@@ -61,7 +73,7 @@ void getjoystick() {
   {
     tpos = 1000;
   }
-  if (!j.z) {
+  if (!js_servo.z) {
     data.cs.laser = true;
   }
   else {
@@ -69,6 +81,18 @@ void getjoystick() {
   }
   data.cs.ppos = ppos;
   data.cs.tpos = tpos;
+
+  if (js_roomba.y < 200) {
+    data.cs.rcom = 'f';
+  } else if (js_roomba.y > 800) {
+    data.cs.rcom = 'b';
+  } else if (js_roomba.x > 800) {
+    data.cs.rcom = 'r';
+  } else if (js_roomba.x < 200) {
+    data.cs.rcom = 'l';
+  } else {
+    data.cs.rcom = 's';
+  }
 }
 
 void getlightsensor()
@@ -80,12 +104,13 @@ void printlcd()
 {
   lcd.home();
   lcd.print(3000 - data.cs.ppos);
-  lcd.print(" ");
+  lcd.print(' ');
   lcd.print(data.cs.tpos);
   lcd.setCursor(0, 1);
- // lcd.print("LSR ");
   lcd.print(data.cs.laser ? "1 " : "0 ");
   lcd.print(ls >= 1000 ? 999 : ls);
+  lcd.print(' ');
+  lcd.print(data.cs.rcom);
 }
 
 void writebt() {
@@ -96,13 +121,17 @@ void writebt() {
 void setup()
 {
   // put your setup code here, to run once:
-  pinMode(JoyStick_X, INPUT);
-  pinMode(JoyStick_Y, INPUT);
-  pinMode(JoyStick_Z, INPUT_PULLUP);
+  pinMode(JS_SERVO_X, INPUT);
+  pinMode(JS_SERVO_Y, INPUT);
+  pinMode(JS_SERVO_Z, INPUT_PULLUP);
+
+  pinMode(JS_ROOMBA_X, INPUT);
+  pinMode(JS_ROOMBA_Y, INPUT);
+//  pinMode(JS_SERVO_Z, INPUT_PULLUP);
+
   pinMode(LIGHT_SENSOR, INPUT);
-  pinMode(13, OUTPUT);
-  pinMode(38, OUTPUT);
-  pinMode(idle_pin, OUTPUT);
+  pinMode(IDLE_PIN, OUTPUT);
+
   Serial1.begin(9600);
   lcd.begin(16, 2);
   lcd.setCursor(0, 0);
@@ -110,24 +139,24 @@ void setup()
   data.cs.ppos = 1500;
   data.cs.tpos = 1500;
 
-  j.x = analogRead(JoyStick_X);
-  j.y = analogRead(JoyStick_Y);
-  j.z = 0;
+  js_servo.x = analogRead(JS_SERVO_X);
+  js_servo.y = analogRead(JS_SERVO_Y);
+  js_servo.z = 0;
 
   // init scheduler related tasks
 
   Scheduler_Init();
   Scheduler_StartTask(0, 10, getjoystick);
   Scheduler_StartTask(2, 50, getlightsensor);
-  Scheduler_StartTask(4, 25, writebt);
+  Scheduler_StartTask(4, 15, writebt);
   Scheduler_StartTask(6, 500, printlcd);
 }
 
 void idle(uint32_t idle_period)
 {
-  digitalWrite(idle_pin, HIGH);
+  digitalWrite(IDLE_PIN, HIGH);
   delay(idle_period);
-  digitalWrite(idle_pin, LOW);
+  digitalWrite(IDLE_PIN, LOW);
 }
 void loop()
 {
