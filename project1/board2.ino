@@ -10,7 +10,7 @@ const int LED_PIN = 13;
 const float alpha = 0.5;
 const int idle_pin = 40;
 
-int ls = 0;
+uint16_t ls = 0;
 
 struct controlstate {
   uint16_t ppos;
@@ -118,8 +118,8 @@ void setup()
 
   Scheduler_Init();
   Scheduler_StartTask(0, 10, getjoystick);
-  Scheduler_StartTask(2, 40, getlightsensor);
-  Scheduler_StartTask(4, 30, writebt);
+  Scheduler_StartTask(2, 50, getlightsensor);
+  Scheduler_StartTask(4, 25, writebt);
   Scheduler_StartTask(6, 500, printlcd);
 }
 
