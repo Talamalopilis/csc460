@@ -14,6 +14,15 @@ const uint16_t LIGHT_SENSOR = A10;
 const uint16_t LED_PIN = 13;
 const uint16_t IDLE_PIN = 40;
 
+const uint16_t JS_SENSITIVITY = 50; // note, higher number means JS moves slower
+const uint16_t JS_THRESHOLD_MAX = 800;
+const uint16_t JS_THRESHOLD_MIN = 200;
+const uint16_t JS_SERVO_X_NEUTRAL = 509;
+const uint16_t JS_SERVO_Y_NEUTRAL = 510;
+
+const uint16_t SERVO_MAX = 2000;
+const uint16_t SERVO_MIN = 1000;
+
 uint16_t ls = 0;
 
 struct controlstate {
@@ -53,24 +62,24 @@ void getjoystick() {
   int ppos = data.cs.ppos;
   int tpos = data.cs.tpos;
 
-  ppos += (js_servo.x - 509) / 50;
-  tpos += (js_servo.y - 510) / 50;
+  ppos += (js_servo.x - JS_SERVO_X_NEUTRAL) / 50;
+  tpos += (js_servo.y - JS_SERVO_Y_NEUTRAL) / 50;
 
-  if (ppos > 2000)
+  if (ppos > SERVO_MAX)
   {
-    ppos = 2000;
+    ppos = SERVO_MAX;
   }
-  else if (ppos < 1000)
+  else if (ppos < SERVO_MIN)
   {
-    ppos = 1000;
+    ppos = SERVO_MIN;
   }
-  if (tpos > 2000)
+  if (tpos > SERVO_MAX)
   {
-    tpos = 2000;
+    tpos = SERVO_MAX;
   }
-  else if (tpos < 1000)
+  else if (tpos < SERVO_MIN)
   {
-    tpos = 1000;
+    tpos = SERVO_MIN;
   }
   if (!js_servo.z) {
     data.cs.laser = true;
@@ -81,13 +90,13 @@ void getjoystick() {
   data.cs.ppos = ppos;
   data.cs.tpos = tpos;
 
-  if (js_roomba.y < 200) {
+  if (js_roomba.y < JS_THRESHOLD_MIN) {
     data.cs.rcom = 'f';
-  } else if (js_roomba.y > 800) {
+  } else if (js_roomba.y > JS_THRESHOLD_MAX) {
     data.cs.rcom = 'b';
-  } else if (js_roomba.x > 800) {
+  } else if (js_roomba.x > JS_THRESHOLD_MAX) {
     data.cs.rcom = 'r';
-  } else if (js_roomba.x < 200) {
+  } else if (js_roomba.x < JS_THRESHOLD_MIN) {
     data.cs.rcom = 'l';
   } else {
     data.cs.rcom = 's';
