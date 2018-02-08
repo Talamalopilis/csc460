@@ -2,18 +2,17 @@
 #include <LiquidCrystal.h>
 #include "scheduler.h"
 
-const int JS_SERVO_X = A8;
-const int JS_SERVO_Y = A9;
-const int JS_SERVO_Z = 32;
+const uint16_t JS_SERVO_X = A8;
+const uint16_t JS_SERVO_Y = A9;
+const uint16_t JS_SERVO_Z = 32;
 
-const int JS_ROOMBA_X = A11;
-const int JS_ROOMBA_Y = A12;
-const int JS_ROOMBA_Z = 33;
+const uint16_t JS_ROOMBA_X = A11;
+const uint16_t JS_ROOMBA_Y = A12;
+const uint16_t JS_ROOMBA_Z = 33;
 
-const int LIGHT_SENSOR = A10;
-const int LED_PIN = 13;
-const float ALPHA = 0.5;
-const int IDLE_PIN = 40;
+const uint16_t LIGHT_SENSOR = A10;
+const uint16_t LED_PIN = 13;
+const uint16_t IDLE_PIN = 40;
 
 uint16_t ls = 0;
 
@@ -30,8 +29,8 @@ union Data {
 };
 
 struct joyvals {
-  int x, y;
-  int z;
+  uint16_t x, y;
+  uint16_t z;
 };
 
 struct joyvals js_servo;
