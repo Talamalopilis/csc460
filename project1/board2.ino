@@ -2,26 +2,18 @@
 #include <LiquidCrystal.h>
 #include "scheduler.h"
 
-const uint16_t JS_SERVO_X = A8;
-const uint16_t JS_SERVO_Y = A9;
-const uint16_t JS_SERVO_Z = 32;
+const int JS_SERVO_X = A8;
+const int JS_SERVO_Y = A9;
+const int JS_SERVO_Z = 32;
 
-const uint16_t JS_ROOMBA_X = A11;
-const uint16_t JS_ROOMBA_Y = A12;
-const uint16_t JS_ROOMBA_Z = 33;
+const int JS_ROOMBA_X = A11;
+const int JS_ROOMBA_Y = A12;
+const int JS_ROOMBA_Z = 33;
 
-const uint16_t LIGHT_SENSOR = A10;
-const uint16_t LED_PIN = 13;
-const uint16_t IDLE_PIN = 40;
-
-const uint16_t JS_SENSITIVITY = 50; // note, higher number means JS moves slower
-const uint16_t JS_THRESHOLD_MAX = 800;
-const uint16_t JS_THRESHOLD_MIN = 200;
-const uint16_t JS_SERVO_X_NEUTRAL = 509;
-const uint16_t JS_SERVO_Y_NEUTRAL = 510;
-
-const uint16_t SERVO_MAX = 2000;
-const uint16_t SERVO_MIN = 1000;
+const int LIGHT_SENSOR = A10;
+const int LED_PIN = 13;
+const float ALPHA = 0.5;
+const int IDLE_PIN = 40;
 
 uint16_t ls = 0;
 
@@ -38,8 +30,8 @@ union Data {
 };
 
 struct joyvals {
-  uint16_t x, y;
-  uint16_t z;
+  int x, y;
+  int z;
 };
 
 struct joyvals js_servo;
@@ -62,24 +54,24 @@ void getjoystick() {
   int ppos = data.cs.ppos;
   int tpos = data.cs.tpos;
 
-  ppos += (js_servo.x - JS_SERVO_X_NEUTRAL) / 50;
-  tpos += (js_servo.y - JS_SERVO_Y_NEUTRAL) / 50;
+  ppos += (js_servo.x - 509) / 50;
+  tpos += (js_servo.y - 510) / 50;
 
-  if (ppos > SERVO_MAX)
+  if (ppos > 2000)
   {
-    ppos = SERVO_MAX;
+    ppos = 2000;
   }
-  else if (ppos < SERVO_MIN)
+  else if (ppos < 1000)
   {
-    ppos = SERVO_MIN;
+    ppos = 1000;
   }
-  if (tpos > SERVO_MAX)
+  if (tpos > 2000)
   {
-    tpos = SERVO_MAX;
+    tpos = 2000;
   }
-  else if (tpos < SERVO_MIN)
+  else if (tpos < 1000)
   {
-    tpos = SERVO_MIN;
+    tpos = 1000;
   }
   if (!js_servo.z) {
     data.cs.laser = true;
@@ -90,13 +82,13 @@ void getjoystick() {
   data.cs.ppos = ppos;
   data.cs.tpos = tpos;
 
-  if (js_roomba.y < JS_THRESHOLD_MIN) {
+  if (js_roomba.y < 200) {
     data.cs.rcom = 'f';
-  } else if (js_roomba.y > JS_THRESHOLD_MAX) {
+  } else if (js_roomba.y > 800) {
     data.cs.rcom = 'b';
-  } else if (js_roomba.x > JS_THRESHOLD_MAX) {
+  } else if (js_roomba.x > 800) {
     data.cs.rcom = 'r';
-  } else if (js_roomba.x < JS_THRESHOLD_MIN) {
+  } else if (js_roomba.x < 200) {
     data.cs.rcom = 'l';
   } else {
     data.cs.rcom = 's';
