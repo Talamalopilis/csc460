@@ -43,7 +43,7 @@ void readbt() {
 			else {
 				return;
 			}
-		};
+		}
 		if (Serial1.available() > sizeof(controlstate)) {
 			Serial1.read();
 			Serial1.readBytes(btin.bt, sizeof(controlstate));
