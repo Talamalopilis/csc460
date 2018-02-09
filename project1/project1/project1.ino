@@ -8,11 +8,10 @@ int const tiltpin = 3;
 float alpha = 0.5;
 int idle_pin = 40;
 
-byte csbuff[6];
-
 struct controlstate {
   uint16_t ppos;
   uint16_t tpos;
+  char rcom;
   bool laser;
 };
 
@@ -65,6 +64,7 @@ void changestate()
   pan.writeMicroseconds(3000 - btin.cs.ppos);
   tilt.writeMicroseconds(btin.cs.tpos);
   digitalWrite(laserpin, btin.cs.laser);
+  Serial2.write(btin.cs.rcom);
 }
 
 void setup()
@@ -74,6 +74,7 @@ void setup()
   pinMode(idle_pin, OUTPUT);
   Serial.begin(9600);
   Serial1.begin(9600);
+  Serial2.begin(9600);
   pan.attach(panpin);
   tilt.attach(tiltpin);
   pan.writeMicroseconds(btin.cs.ppos);
@@ -83,8 +84,8 @@ void setup()
   // init scheduler related tasks
 
   Scheduler_Init();
-  Scheduler_StartTask(0, 20, readbt);
-  Scheduler_StartTask(10, 20, changestate);
+  Scheduler_StartTask(0, 10, readbt);
+  Scheduler_StartTask(2, 20, changestate);
 }
 void idle(uint32_t idle_period)
 {
@@ -99,8 +100,9 @@ void idle(uint32_t idle_period)
 }
 void loop()
 {
-	Serial.println(btin.cs.ppos);
+	/*Serial.println(btin.cs.ppos);
 	Serial.println(btin.cs.tpos);
+	Serial.println(btin.cs.rcom);*/
 	uint32_t idle_period = Scheduler_Dispatch();
 	if (idle_period)
 	{
