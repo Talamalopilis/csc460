@@ -1,3 +1,5 @@
+#define F_CPU 16000000UL
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
@@ -27,8 +29,8 @@ void setupTimer() {
 	
 }
 
-ISR(TIMER4_COMPA_vect) {
-	PORTB ~= PORTB;
+ISR(TIMER3_COMPA_vect) {
+	PORTB = ~PORTB;
 }
 
 int main() {
