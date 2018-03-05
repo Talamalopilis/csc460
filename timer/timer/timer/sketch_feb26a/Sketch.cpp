@@ -48,9 +48,13 @@ void setupTimer() {
 
 ISR(TIMER4_COMPA_vect) {
   PORTL = ~PORTL;
-  
+  x++;
   lcd.home();
-  lcd.print(++x);
+  lcd.print(x/6000, DEC);
+  lcd.print(":");
+  lcd.print(x/100 % 60, DEC);
+  lcd.print(":");
+  lcd.print(x % 100, DEC);
   
   PORTL = ~PORTL;
 }
