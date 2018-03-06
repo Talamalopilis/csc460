@@ -21,7 +21,7 @@
 
 /* locations of well-known registers */
 SREG  = 0x3F
-EIND = 0X3C
+EIND = 0x3C
 SPH    = 0x3E
 SPL    = 0x3D
 
@@ -141,7 +141,7 @@ CSwitch:
         /* 
           * Assume I = 0, i.e., all interrupts are disabled.
           */
-        SAVECTX
+       SAVECTX
         /* 
           * Now, we have saved the CurrentP's context.
           * Save the current H/W stack pointer into CurrentP->sp.
@@ -172,5 +172,6 @@ Exit_Kernel:
           * Note: at the bottom of the CurrentP's context is its return address.
           */
         RESTORECTX
+		nop
         ret    /* don't use rti to re-enable interrupts */
 /* end of CSwitch() */

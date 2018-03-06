@@ -1,5 +1,8 @@
+#define F_CPU 16000000UL
+#include <util/delay.h>
 #include <string.h>
 #include <avr/io.h>
+#include <stdio.h>
 #include "LED_Test.h"
 /**
  * \file shared.c
@@ -121,9 +124,6 @@ volatile static unsigned int Tasks;
 void Kernel_Create_Task_At( PD *p, voidfuncptr f ) 
 {   
    unsigned char *sp;
-#ifdef DEBUG
-   int counter = 0;
-#endif
 
    sp = (unsigned char *) &(p->workSpace[WORKSPACE-1]);
 
@@ -142,13 +142,15 @@ void Kernel_Create_Task_At( PD *p, voidfuncptr f )
    //Store terminate at the bottom of stack to protect against stack underrun.
    *(unsigned char *)sp-- = ((unsigned int)Task_Terminate) & 0xff;
    *(unsigned char *)sp-- = (((unsigned int)Task_Terminate) >> 8) & 0xff;
-
+   *(unsigned char *)sp-- = 0;
+   
    //Place return address of function at bottom of stack
    *(unsigned char *)sp-- = ((unsigned int)f) & 0xff;
    *(unsigned char *)sp-- = (((unsigned int)f) >> 8) & 0xff;
-
+   *(unsigned char *)sp-- = 0;
+   
    //Place stack pointer at top of stack
-   sp = sp - 33;
+   sp = sp - 34;
       
    p->sp = sp;		/* stack pointer into the "workSpace" */
 
@@ -291,20 +293,20 @@ void Task_Terminate()
   * A cooperative "Ping" task.
   * Added testing code for LEDs.
   */
+
+
 void Ping() 
 {
   int  x ;
-  // DDRB = 0xff;
+  DDRL = 0xff;
   for(;;){
   	//LED on
-	PORTB = 0xff;
+	PORTL = 0xff;
 
-    for( x=0; x < 32000; ++x );   /* do nothing */
-	for( x=0; x < 32000; ++x );   /* do nothing */
-	for( x=0; x < 32000; ++x );   /* do nothing */
+    _delay_ms(1000);
 
 	//LED off
-	PORTB = 0x00;
+	PORTL = 0x00;
 	  
     /* printf( "*" );  */
     Task_Next();
@@ -319,17 +321,15 @@ void Ping()
 void Pong() 
 {
   int  x;
-  // DDRL = 0xff;
+  DDRB = 0xff;
   for(;;) {
 	//LED on
-	PORTL = 0xff;
-
-    for( x=0; x < 32000; ++x );   /* do nothing */
-	for( x=0; x < 32000; ++x );   /* do nothing */
-	for( x=0; x < 32000; ++x );   /* do nothing */
+	PORTB = 0xff;
+	_delay_ms(1000);
+	
 
 	//LED off
-	PORTL = 0x00;
+	PORTB = 0x11;
 
     /* printf( "." );  */
     Task_Next();
