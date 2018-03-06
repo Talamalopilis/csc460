@@ -19,9 +19,9 @@
 
 DEVICE = atmega2560
 CLOCK = 16000000
-PROGRAMMER = -c avrispmkII -P \\..\\COM3 -b 115200 -D
-OBJECTS = cswitch.o LED_Test.o
-FUSES	= -U lfuse:w:0xff:m	-U hfuse:w:0xd8:m	-U efuse:w:0xFD:m
+PROGRAMMER = -c avrispmkII -P \\..\\COM8 -b 115200 -D
+OBJECTS = LED_Test.o shared.o
+FUSES = -U lfuse:w:0xff:m	-U hfuse:w:0xd8:m	-U efuse:w:0xFD:m
 
 # ATMega8 fuse bits used above (fuse bits for other devices are different!):
 # Example for 8 MHz internal oscillator
@@ -52,53 +52,53 @@ AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE)
 COMPILE = avr-gcc -Wall -Wno-main -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE)
 
 # symbolic targets:
-all: switch kernel.hex
+all: switch kernel.hex fuse
 
 .c.o:
-$(COMPILE) -c $< -o $@
+	$(COMPILE) -c $< -o $@
 
 .S.o:
-$(COMPILE) -x assembler-with-cpp -c $< -o $@
+	$(COMPILE) -x assembler-with-cpp -c $< -o $@
 # "-x assembler-with-cpp" should not be necessary since this is the default
 # file type for the .S (with capital S) extension. However, upper case
 # characters are not always preserved on Windows. To ensure WinAVR
 # compatibility define the file type manually.
 
 .c.s:
-$(COMPILE) -S $< -o $@
+	$(COMPILE) -S $< -o $@
 
 flash:	all
-$(AVRDUDE) -U flash:w:kernel.hex:i
+	$(AVRDUDE) -U flash:w:kernel.hex:i
 
 fuse:
-$(AVRDUDE) $(FUSES)
+	$(AVRDUDE) $(FUSES)
 
 # Xcode uses the Makefile targets "", "clean" and "install"
 install: flash fuse 
 # if you use a bootloader, change the command below appropriately:
 load: all
-bootloadHID kernel.hex
+	bootloadHID kernel.hex
 
 clean:
-rm -f kernel.hex kernel.elf $(OBJECTS)
+	rm -f kernel.hex kernel.elf $(OBJECTS)
 
 # file targets:
 kernel.elf: $(OBJECTS)
-$(COMPILE) -o kernel.elf $(OBJECTS)
+	$(COMPILE) -o kernel.elf $(OBJECTS)
 
 kernel.hex: kernel.elf
-rm -f kernel.hex
-avr-objcopy -j .text -j .data -O ihex kernel.elf kernel.hex
-avr-size --format=avr --mcu=$(DEVICE) kernel.elf
+	rm -f kernel.hex
+	avr-objcopy -j .text -j .data -O ihex kernel.elf kernel.hex
+	avr-size --format=avr --mcu=$(DEVICE) kernel.elf
 # If you have an EEPROM section, you must also create a hex file for the
 # EEPROM and add it to the "flash" target.
 
 # Targets for code debugging and analysis:
 disasm:	kernel.elf
-avr-objdump -d kernel.elf
+	avr-objdump -d kernel.elf
 
 cpp:
-$(COMPILE) -E kernel.c LED/LED_Test.c UART/*.c common.c main.c sensor/joystick.c Roomba/roomba.o
+	$(COMPILE) -E LED_Test.c shared.c
 
 switch:
-avr-gcc -c -O2 -DF_CPU=${CLOCK} -mmcu=${DEVICE} -Wa,--gstabs -o cswitch.o cswitch.S
+	avr-gcc -c -O2 -DF_CPU=${CLOCK} -mmcu=${DEVICE} -Wa,--gstabs -o cswitch.o cswitch.S
