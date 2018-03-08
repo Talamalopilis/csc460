@@ -1,7 +1,10 @@
 #define F_CPU 16000000UL
+
+// avr libraries
 #include <util/delay.h>
 #include <string.h>
 #include <avr/io.h>
+#include <avr/interrupt.h>
 #include <stdio.h>
 #include "LED_Test.h"
 /**
@@ -112,7 +115,9 @@ volatile static unsigned int NextP;
 volatile static unsigned int KernelActive;  
 
 /** number of tasks created so far */
-volatile static unsigned int Tasks;  
+volatile static unsigned int Tasks;
+
+volatile unsigned long int timer = 0;
 
 
 /**
@@ -150,7 +155,7 @@ void Kernel_Create_Task_At( PD *p, voidfuncptr f )
    *(unsigned char *)sp-- = 0;
    
    //Place stack pointer at top of stack
-   sp = sp - 34;
+   sp = sp - 33;
       
    p->sp = sp;		/* stack pointer into the "workSpace" */
 
@@ -191,6 +196,7 @@ void Dispatch()
      /* find the next READY task
        * Note: if there is no READY task, then this will loop forever!.
        */
+   CurrentP ->state = READY;
    while(Process[NextP].state != READY) {
       NextP = (NextP + 1) % MAXPROCESS;
    }
@@ -238,7 +244,7 @@ void OS_Start()
 
       /* here we go...  */
       KernelActive = 1;
-      asm ( "jmp Exit_Kernel":: );
+      asm("jmp Exit_Kernel"::);
    }
 }
 
@@ -283,11 +289,38 @@ void Task_Terminate()
    }
 }
 
+ISR(TIMER4_COMPA_vect) {
+	asm("jmp CSwitch":: );
+}
+
 
 /*============
   * A Simple Test 
   *============
   */
+
+void setupTimer() {
+	TCCR4A = 0;
+	TCCR4B = 0;
+	
+	//set to CTC (mode 4)
+	TCCR4B |= (1 << WGM32);
+	
+	//set prescaler to 256
+	TCCR4B |= (1 << CS42);
+	
+	//set TOP value (0.01 seconds)
+	OCR4A = 625;
+	
+	//Enable interrupt A for timer 3
+	TIMSK4 |= (1 << OCIE4A);
+	
+	//Set timer to 0
+	TCNT4 = 0;
+	
+	sei();
+	
+}
 
 /**
   * A cooperative "Ping" task.
@@ -297,19 +330,20 @@ void Task_Terminate()
 
 void Ping() 
 {
-  int  x ;
+  int x,y;
   DDRL = 0xff;
   for(;;){
   	//LED on
 	PORTL = 0xff;
 
-    _delay_ms(1000);
+	for( y=0; y < 32; ++y ) {for( x=0; x < 32000; ++x ) {asm("");}}
 
 	//LED off
-	PORTL = 0x00;
+	PORTL = 0;
+
+	for( y=0; y < 32; ++y ) {for( x=0; x < 32000; ++x ) {asm("");}}
 	  
     /* printf( "*" );  */
-    Task_Next();
   }
 }
 
@@ -320,19 +354,19 @@ void Ping()
   */
 void Pong() 
 {
-  int  x;
-  DDRB = 0xff;
+  int x,y;
+  DDRC = 0xff;
   for(;;) {
 	//LED on
-	PORTB = 0xff;
-	_delay_ms(1000);
-	
+	PORTC = 0xff;
+	for( y=0; y < 64; ++y ) {for( x=0; x < 32000; ++x ) {asm("");}}
 
 	//LED off
-	PORTB = 0x11;
+	PORTC = 0;
+	
+	for( y=0; y < 64; ++y ) {for( x=0; x < 32000; ++x ) {asm("");}}
 
     /* printf( "." );  */
-    Task_Next();
 	
   }
 }
@@ -342,10 +376,11 @@ void Pong()
   * This function creates two cooperative tasks, "Ping" and "Pong". Both
   * will run forever.
   */
-void main() 
+int main() 
 {
    OS_Init();
    Task_Create( Pong );
-   Task_Create( Ping );
+   Task_Create( Ping );  
+   setupTimer();
    OS_Start();
 }

@@ -34,9 +34,9 @@ SPL    = 0x3D
 ; in reverse. Also, when a new process is created, it is important to 
 ; initialize its "initial" context in the same order as SAVECTX.
 ;	
+; note, that due to the ISR being initialised in C, the ISR seems to automatically
+; add a section where it pushes R1, R0, and SREG onto the stack, so need to be aware of extra bytes
 .macro	SAVECTX
-	push	r0
-	push	r1
 	push	r2
 	push	r3
 	push	r4
@@ -67,19 +67,11 @@ SPL    = 0x3D
 	push	r29
 	push	r30
 	push	r31
-	in r31, EIND
-	push r31
-	in	r16, SREG
-	push	r16
 .endm
 ;
 ; Pop all registers and the status registers
 ;
 .macro	RESTORECTX
-	pop r31
-	out SREG, r31
-	pop r31
-	out EIND, r31
 	pop	r31
 	pop	r30
 	pop	r29
@@ -110,8 +102,11 @@ SPL    = 0x3D
 	pop	r4
 	pop	r3
 	pop	r2
-	pop	r1
 	pop	r0
+	out SREG, r0
+	pop r0
+	pop r1
+
 .endm
 
         .section .text
@@ -172,6 +167,5 @@ Exit_Kernel:
           * Note: at the bottom of the CurrentP's context is its return address.
           */
         RESTORECTX
-		nop
-        ret    /* don't use rti to re-enable interrupts */
+        reti    /* don't use rti to re-enable interrupts */
 /* end of CSwitch() */

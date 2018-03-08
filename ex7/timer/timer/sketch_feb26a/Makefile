@@ -19,8 +19,8 @@
 
 DEVICE = atmega2560
 CLOCK = 16000000
-PROGRAMMER = -c avrispmkII -P \\..\\COM8 -b 115200 -D
-OBJECTS = LED_Test.o shared.o
+PROGRAMMER = -c avrispmkII -P COM8 -b 115200 -D
+OBJECTS = LED_Test.o shared.o cswitch.o
 FUSES = -U lfuse:w:0xff:m	-U hfuse:w:0xd8:m	-U efuse:w:0xFD:m
 
 # ATMega8 fuse bits used above (fuse bits for other devices are different!):
@@ -52,7 +52,7 @@ AVRDUDE = avrdude $(PROGRAMMER) -p $(DEVICE)
 COMPILE = avr-gcc -Wall -Wno-main -Os -DF_CPU=$(CLOCK) -mmcu=$(DEVICE)
 
 # symbolic targets:
-all: switch kernel.hex fuse
+all: switch kernel.hex
 
 .c.o:
 	$(COMPILE) -c $< -o $@
@@ -98,7 +98,7 @@ disasm:	kernel.elf
 	avr-objdump -d kernel.elf
 
 cpp:
-	$(COMPILE) -E LED_Test.c shared.c
+	$(COMPILE) -E LED_Test.c shared.cpp
 
 switch:
 	avr-gcc -c -O2 -DF_CPU=${CLOCK} -mmcu=${DEVICE} -Wa,--gstabs -o cswitch.o cswitch.S
