@@ -112,7 +112,7 @@ volatile PD* CurrentP;
 volatile static unsigned int NextP;  
 
 /** 1 if kernel has been started; 0 otherwise. */
-volatile static unsigned int KernelActive;  
+volatile uint8_t KernelActive;  
 
 /** number of tasks created so far */
 volatile static unsigned int Tasks;
@@ -200,6 +200,8 @@ void Dispatch()
    while(Process[NextP].state != READY) {
       NextP = (NextP + 1) % MAXPROCESS;
    }
+   
+   PORTL = NextP;
 
      /* we have a new CurrentP */
    CurrentP = &(Process[NextP]);
@@ -331,15 +333,15 @@ void setupTimer() {
 void Ping() 
 {
   int x,y;
-  DDRL = 0xff;
+  DDRB = 0xff;
   for(;;){
   	//LED on
-	PORTL = 0xff;
+	PORTB = 0xff;
 
 	for( y=0; y < 32; ++y ) {for( x=0; x < 32000; ++x ) {asm("");}}
 
 	//LED off
-	PORTL = 0;
+	PORTB = 0;
 
 	for( y=0; y < 32; ++y ) {for( x=0; x < 32000; ++x ) {asm("");}}
 	  
@@ -378,6 +380,7 @@ void Pong()
   */
 int main() 
 {
+   DDRL = 0xff;
    OS_Init();
    Task_Create( Pong );
    Task_Create( Ping );  

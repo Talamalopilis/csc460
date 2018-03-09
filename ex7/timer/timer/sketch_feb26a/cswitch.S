@@ -114,6 +114,7 @@ SPL    = 0x3D
         .global Exit_Kernel
         .extern Dispatch
         .extern CurrentP     /* CurrentP->sp is the first entry in CurrentP's descriptor  */
+		.extern KernelActive
 /*
   * The actual CSwitch() code begins here.
   *
@@ -132,10 +133,20 @@ SPL    = 0x3D
   * void CSwitch();
   * void Exit_Kernel(); 
   */
+Kernel_Inactive:
+		pop r0
+		out SREG, r0
+		pop r0
+		pop r1
+		reti
+
 CSwitch:
         /* 
           * Assume I = 0, i.e., all interrupts are disabled.
           */
+	   lds r1, KernelActive
+	   tst r1
+	   breq Kernel_Inactive
        SAVECTX
         /* 
           * Now, we have saved the CurrentP's context.
