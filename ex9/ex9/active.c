@@ -95,6 +95,12 @@ typedef enum kernel_request_type {
   TERMINATE
 } KERNEL_REQUEST_TYPE;
 
+typedef enum priority_levels {
+	ROUND_ROBIN = 0,
+	PERIODIC,
+	SYSTEM
+} PRIORITY_LEVELS;
+
 /**
   * Each task is represented by a process descriptor, which contains all
   * relevant information about this task. For convenience, we also store
@@ -105,6 +111,7 @@ typedef struct ProcessDescriptor
   unsigned char *sp; /* stack pointer into the "workSpace" */
   unsigned char workSpace[WORKSPACE];
   PROCESS_STATES state;
+  PRIORITY_LEVELS priority;
   voidfuncptr code; /* function to be executed as a task */
   KERNEL_REQUEST_TYPE request;
 } PD;
@@ -113,7 +120,10 @@ typedef struct ProcessDescriptor
   * This table contains ALL process descriptors. It doesn't matter what
   * state a task is in.
   */
-static PD Process[MAXPROCESS];
+static PD round_robin_tasks[MAXPROCESS];
+static PD system_tasks[MAXPROCESS];
+static PD periodic_tasks[MAXPROCESS];
+
 
 /**
   * The process descriptor of the currently RUNNING task.
@@ -138,7 +148,9 @@ volatile unsigned char *KernelSp;
 volatile unsigned char *CurrentSp;
 
 /** index to next task to run */
-volatile static unsigned int NextP;
+volatile static unsigned int NextP_RR;
+volatile static unsigned int NextP_Per;
+volatile static unsigned int NextP_Sys;
 
 /** 1 if kernel has been started; 0 otherwise. */
 volatile uint8_t KernelActive;
@@ -196,9 +208,25 @@ void Kernel_Create_Task_At(PD *p, voidfuncptr f)
 /**
   *  Create a new task
   */
-static void Kernel_Create_Task(voidfuncptr f)
+static void Kernel_Create_Task(voidfuncptr f, unsigned int priority)
 {
   int x;
+  PD * queue;
+  
+  switch (priority) {
+		case ROUND_ROBIN:
+			queue = round_robin_tasks;
+			break;
+		case PERIODIC:
+			queue = periodic_tasks;
+			break;
+		case SYSTEM:
+			queue = system_tasks;
+			break;
+		default:
+			queue = round_robin_tasks;
+			break;
+  }
 
   if (Tasks == MAXPROCESS)
     return; /* Too many task! */
@@ -206,12 +234,12 @@ static void Kernel_Create_Task(voidfuncptr f)
   /* find a DEAD PD that we can use  */
   for (x = 0; x < MAXPROCESS; x++)
   {
-    if (Process[x].state == DEAD)
+    if (queue[x].state == DEAD)
       break;
   }
 
   ++Tasks;
-  Kernel_Create_Task_At(&(Process[x]), f);
+  Kernel_Create_Task_At(&(queue[x]), f);
 }
 
 /**
@@ -223,16 +251,18 @@ static void Dispatch()
   /* find the next READY task
        * Note: if there is no READY task, then this will loop forever!.
        */
-  while (Process[NextP].state != READY)
+	
+  
+  while (round_robin_tasks[NextP_RR].state != READY)
   {
-    NextP = (NextP + 1) % MAXPROCESS;
+    NextP_RR = (NextP_RR + 1) % MAXPROCESS;
   }
 
-  Cp = &(Process[NextP]);
+  Cp = &(round_robin_tasks[NextP_RR]);
   CurrentSp = Cp->sp;
   Cp->state = RUNNING;
 
-  NextP = (NextP + 1) % MAXPROCESS;
+  NextP_RR = (NextP_RR + 1) % MAXPROCESS;
 }
 
 /**
@@ -263,7 +293,7 @@ static void Next_Kernel_Request()
     switch (Cp->request)
     {
     case CREATE:
-      Kernel_Create_Task(Cp->code);
+      Kernel_Create_Task(Cp->code, Cp->priority);
       break;
     case NEXT:
     case NONE:
@@ -298,12 +328,14 @@ void OS_Init()
 
   Tasks = 0;
   KernelActive = 0;
-  NextP = 0;
+  NextP_RR = 0;
+  NextP_Per = 0;
+  NextP_Sys = 0;
   //Reminder: Clear the memory for the task on creation.
   for (x = 0; x < MAXPROCESS; x++)
   {
-    memset(&(Process[x]), 0, sizeof(PD));
-    Process[x].state = DEAD;
+    memset(&(round_robin_tasks[x]), 0, sizeof(PD));
+    round_robin_tasks[x].state = DEAD;
   }
 }
 
@@ -352,19 +384,20 @@ void OS_Start()
   * each task gives up its share of the processor voluntarily by calling
   * Task_Next().
   */
-  void Task_Create(voidfuncptr f)
+  void Task_Create_RR(voidfuncptr f)
   {
     if (KernelActive)
     {
       Disable_Interrupt();
       Cp->request = CREATE;
+	  Cp->priority = ROUND_ROBIN;
       Cp->code = f;
       Enter_Kernel();
     }
     else
     {
       /* call the RTOS function directly */
-      Kernel_Create_Task(f);
+      Kernel_Create_Task(f, ROUND_ROBIN);
     }
   }
 
@@ -482,8 +515,8 @@ void OS_Start()
   int main()
   {
     OS_Init();
-    Task_Create(Pong);
-    Task_Create(Ping);
+    Task_Create_RR(Pong);
+    Task_Create_RR(Ping);
     setupTimer();
     OS_Start();
   }

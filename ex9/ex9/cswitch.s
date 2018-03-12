@@ -20,6 +20,7 @@
 
 
 /* locations of well-known registers */
+PORTL = 0x10B
 SREG  = 0x3F
 SPH    = 0x3E
 SPL    = 0x3D
@@ -167,6 +168,7 @@ Exit_Kernel:
           * Note: at the bottom of the Cp's context is its return address.
           */
         RESTORECTX
+		call Disable_Interrupt_Probe
         reti         /* re-enable all global interrupts */
 /*
   * All system call eventually enters here!
@@ -184,51 +186,70 @@ Exit_Kernel:
   * void Enter_Kernel();
   */
 
+Enable_Interrupt_Probe:
+	push r16
+	lds r16, PORTL
+	ori r16, (1 << 0)
+	sts PORTL, r16
+	pop r0
+	ret
+	
+
+Disable_Interrupt_Probe:
+	push r16
+	lds r16, PORTL
+	andi r16, ~(1 << 0)
+	sts PORTL, r16
+	pop r16
+	ret
+
+// interrupt triggered when kernel hasn't finished booting
 Kernel_Inactive:
-		pop r0
-		out SREG, r0
-		pop r0
-		pop r1
-		reti
+	pop r0
+	out SREG, r0
+	pop r0
+	pop r1
+	reti
 
 Enter_Kernel_Interrupt:
-	    lds r1, KernelActive
-	    tst r1
-	    breq Kernel_Inactive
-		jmp Enter_Kernel_Active	
+	call Enable_Interrupt_Probe
+	lds r1, KernelActive
+	tst r1
+	breq Kernel_Inactive
+	jmp Enter_Kernel_Active	
 
 Enter_Kernel:
-		SAVECISR   
-        /*
-          * This is the "bottom" half of CSwitch(). We are still executing in
-          * Cp's context.
-          */
+	SAVECISR   
+    /*
+        * This is the "bottom" half of CSwitch(). We are still executing in
+        * Cp's context.
+        */
 Enter_Kernel_Active:
-        SAVECTX
-        /* 
-          * Now, we have saved the Cp's context.
-          * Save the current H/W stack pointer into CurrentSp.
-          */
-        in   r30, SPL
-        in   r31, SPH
-        sts  CurrentSp, r30
-        sts  CurrentSp+1, r31
-        /*
-          * We are now ready to restore kernel's context, i.e.,
-          * switching the H/W stack pointer back to KernelSp.
-          */ 
-        lds  r30, KernelSp
-        lds  r31, KernelSp+1
-        out  SPL, r30
-        out  SPH, r31
-        /*
-          * We are now executing in kernel's stack.
-          */
-       RESTORECTX
-        /* 
-          * We are ready to return to the caller of CSwitch() (or Exit_Kernel()).
-          * Note: We should NOT re-enable interrupts while kernel is running.
-          *         Therefore, we use "ret", and not "reti".
-          */
-       ret
+    SAVECTX
+    /* 
+        * Now, we have saved the Cp's context.
+        * Save the current H/W stack pointer into CurrentSp.
+        */
+    in   r30, SPL
+    in   r31, SPH
+    sts  CurrentSp, r30
+    sts  CurrentSp+1, r31
+    /*
+        * We are now ready to restore kernel's context, i.e.,
+        * switching the H/W stack pointer back to KernelSp.
+        */ 
+    lds  r30, KernelSp
+    lds  r31, KernelSp+1
+    out  SPL, r30
+    out  SPH, r31
+    /*
+        * We are now executing in kernel's stack.
+        */
+    RESTORECTX
+    /* 
+        * We are ready to return to the caller of CSwitch() (or Exit_Kernel()).
+        * Note: We should NOT re-enable interrupts while kernel is running.
+        *         Therefore, we use "ret", and not "reti".
+        */
+    ret
 /* end of CSwitch() */
