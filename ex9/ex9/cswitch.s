@@ -191,7 +191,7 @@ Enable_Interrupt_Probe:
 	lds r16, PORTL
 	ori r16, (1 << 0)
 	sts PORTL, r16
-	pop r0
+	pop r16
 	ret
 	
 
@@ -225,6 +225,7 @@ Enter_Kernel:
         * Cp's context.
         */
 Enter_Kernel_Active:
+	call Enable_Interrupt_Probe
     SAVECTX
     /* 
         * Now, we have saved the Cp's context.
