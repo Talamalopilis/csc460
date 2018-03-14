@@ -83,7 +83,7 @@ typedef enum process_states {
     DEAD = 0,
     READY,
     RUNNING,
-	WAITING
+	SUSPENDED
 } PROCESS_STATES;
 
 /**
@@ -93,7 +93,8 @@ typedef enum kernel_request_type {
     NONE = 0,
     CREATE,
     NEXT,
-    TERMINATE
+    TERMINATE,
+	WAITING
 } KERNEL_REQUEST_TYPE;
 
 typedef enum priority_levels {
@@ -121,8 +122,8 @@ typedef struct ProcessDescriptor
 	TICK wcet;
 	TICK offset;
 	TICK run_length;
-	TICK time_until_run;
-	TICK last_run_time;
+	int16_t time_until_run;
+	TICK last_check_time;
 } PD;
 
 /**
@@ -232,6 +233,7 @@ static void Kernel_Create_Task(voidfuncptr f, unsigned int priority, uint16_t pi
     switch (priority)
     {
 	case IDLE:
+		idle_task.priority = IDLE;
 		Kernel_Create_Task_At(&idle_task, f, pid);
 		return;
     case ROUND_ROBIN:
@@ -248,7 +250,7 @@ static void Kernel_Create_Task(voidfuncptr f, unsigned int priority, uint16_t pi
         break;
     }
 
-    if (Tasks == MAXPROCESS)
+    if (Tasks == MAXPROCESS * 3 + 1)
         return; /* Too many task! */
 
     /* find a DEAD PD that we can use  */
@@ -257,6 +259,8 @@ static void Kernel_Create_Task(voidfuncptr f, unsigned int priority, uint16_t pi
         if (queue[x].state == DEAD)
             break;
     }
+	
+	queue[x].priority = priority;
 
     ++Tasks;
     Kernel_Create_Task_At(&(queue[x]), f, pid);
@@ -288,27 +292,33 @@ static void Dispatch()
 
     for (i = 0; i < MAXPROCESS; ++i)
     {
-        if (system_tasks[NextP_Per].state == READY)
-        {
-            Cp = &(periodic_tasks[NextP_Per]);
-            CurrentSp = Cp->sp;
-            Cp->state = RUNNING;
-            NextP_Sys = (NextP_Per + 1) % MAXPROCESS;
-            return;
-        }
-        NextP_Sys = (NextP_Sys + 1) % MAXPROCESS;
-    }
-
-    for (i = 0; i < MAXPROCESS; ++i)
-    {
         if (periodic_tasks[NextP_Per].state == READY)
         {
             Cp = &(periodic_tasks[NextP_Per]);
-            CurrentSp = Cp->sp;
-            Cp->state = RUNNING;
+			Cp->time_until_run -= Now() - Cp->last_check_time; // check if overflow affects
+			Cp->run_length += Now() - Cp->last_check_time;
+			Cp->last_check_time = Now();
+			if(Cp->run_length > Cp->wcet) {
+				// throw timing overflow error
+			}
+			CurrentSp = Cp->sp;
+			Cp->state = RUNNING;
+			Cp->request = NONE;
             NextP_Per = (NextP_Per + 1) % MAXPROCESS;
             return;
-        }
+        } else if(periodic_tasks[NextP_Per].state == SUSPENDED) {
+			Cp = &(periodic_tasks[NextP_Per]);
+			Cp->time_until_run -= Now() - Cp->last_check_time; // check if overflow affects
+			Cp->last_check_time = Now();
+			if(Cp->time_until_run <= 0) {
+				Cp->run_length = 0;
+				Cp->time_until_run = Cp->period;
+				Cp->state = RUNNING;
+				Cp->request = NONE;
+				NextP_Per = (NextP_Per + 1) % MAXPROCESS;
+				return;
+			}
+		}
         NextP_Per = (NextP_Per + 1) % MAXPROCESS;
     }
 
@@ -353,7 +363,8 @@ static void Next_Kernel_Request()
 
     while (1)
     {
-        Cp->request = NONE; /* clear its request */
+		if(Cp->request != WAITING)
+			Cp->request = NONE; /* clear its request */
 
         /* activate this newly selected task */
         CurrentSp = Cp->sp;
@@ -370,6 +381,9 @@ static void Next_Kernel_Request()
         case CREATE:
             Kernel_Create_Task(Cp->code, Cp->priority, Cp->pid);
             break;
+		case WAITING:
+			Dispatch();
+			break;
         case NEXT:
         case NONE:
             /* NONE could be caused by a timer interrupt */
@@ -422,6 +436,10 @@ void OS_Init()
     {
         memset(&(round_robin_tasks[x]), 0, sizeof(PD));
         round_robin_tasks[x].state = DEAD;
+		memset(&(system_tasks[x]), 0, sizeof(PD));
+		system_tasks[x].state = DEAD;
+		memset(&(periodic_tasks[x]), 0, sizeof(PD));
+		periodic_tasks[x].state = DEAD;
     }
 }
 
@@ -472,13 +490,20 @@ void setupTimer()
   */
 PID Task_Create_RR(voidfuncptr f, int arg)
 {
+	int x;
+	for (x = 0; x < MAXPROCESS; x++)
+	{
+		if (round_robin_tasks[x].state == DEAD)
+		break;
+	}
     if (KernelActive)
     {
         Disable_Interrupt();
-        Cp->request = CREATE;
-        Cp->priority = ROUND_ROBIN;
-        Cp->code = f;
-        Cp->pid = pid_index++;
+        round_robin_tasks[x].request = NONE;
+        round_robin_tasks[x].priority = ROUND_ROBIN;
+        round_robin_tasks[x].code = f;
+        round_robin_tasks[x].pid = pid_index++;
+		Kernel_Create_Task_At(&round_robin_tasks[x], f, pid_index);
         Enter_Kernel();
     }
     else
@@ -491,19 +516,27 @@ PID Task_Create_RR(voidfuncptr f, int arg)
 
 PID Task_Create_Periodic(voidfuncptr f, int arg, TICK period, TICK wcet, TICK offset)
 {
+	int x;
+	for (x = 0; x < MAXPROCESS; x++)
+	{
+		if (periodic_tasks[x].state == DEAD)
+		break;
+	}
 	// for periodic tasks, to make implementation less messy, we will assume that periodic tasks may only be created after the RTOS has started
     if (KernelActive)
     {
         Disable_Interrupt();
-        Cp->request = CREATE;
-        Cp->priority = PERIODIC;
-		Cp->period = period;
-		Cp->wcet = wcet;
-		Cp->offset = offset;
-        Cp->code = f;
-        Cp->pid = pid_index++;
-		Cp->run_length = 0;
-		Cp->time_until_run = offset;
+        periodic_tasks[x].request = NONE;
+        periodic_tasks[x].priority = PERIODIC;
+		periodic_tasks[x].period = period;
+		periodic_tasks[x].wcet = wcet;
+		periodic_tasks[x].offset = offset;
+        periodic_tasks[x].code = f;
+        periodic_tasks[x].pid = pid_index++;
+		periodic_tasks[x].run_length = 0;
+		periodic_tasks[x].time_until_run = offset + period;
+		periodic_tasks[x].last_check_time = Now();
+		Kernel_Create_Task_At(&periodic_tasks[x], f, pid_index);
         Enter_Kernel();
     }
 	return (PID)pid_index;
@@ -511,13 +544,20 @@ PID Task_Create_Periodic(voidfuncptr f, int arg, TICK period, TICK wcet, TICK of
 
 PID Task_Create_System(voidfuncptr f, int arg)
 {
+	int x;
+	for (x = 0; x < MAXPROCESS; x++)
+	{
+		if (system_tasks[x].state == DEAD)
+		break;
+	}
     if (KernelActive)
     {
         Disable_Interrupt();
-        Cp->request = CREATE;
-        Cp->priority = SYSTEM;
-        Cp->code = f;
-        Cp->pid = pid_index++;
+        system_tasks[x].request = NONE;
+        system_tasks[x].priority = SYSTEM;
+        system_tasks[x].code = f;
+        system_tasks[x].pid = pid_index++;
+		Kernel_Create_Task_At(&system_tasks[x], f, pid_index);
         Enter_Kernel();
     }
     else
@@ -543,6 +583,10 @@ void Task_Next()
     {
         Disable_Interrupt();
         Cp->request = NEXT;
+		if(Cp->priority == PERIODIC) {
+			Cp->state = SUSPENDED;
+			Cp->request = WAITING;
+		}
         Enter_Kernel();
     }
 }
@@ -581,9 +625,9 @@ void Ping()
     for (;;)
     {
         //LED on
-        PORTB = 0xff;
+       // PORTB = 0xff;
 
-        for (y = 0; y < 132; ++y)
+        for (y = 0; y < 32; ++y)
         {
             for (x = 0; x < 32000; ++x)
             {
@@ -592,7 +636,7 @@ void Ping()
         }
 
         //LED off
-        PORTB = 0;
+        //PORTB = 0;
 
         for (y = 0; y < 32; ++y)
         {
@@ -641,6 +685,20 @@ void Pong()
     }
 }
 
+void Pong_Period()
+{
+	for(;;) {
+		PORTB = ~PORTB;
+		Task_Next();
+	}
+}
+
+void Task_Init()
+{
+	Task_Create_Periodic(Pong_Period, 0, 100, 10, 0);
+}
+
+
 /**
   * This function creates two cooperative tasks, "Ping" and "Pong". Both
   * will run forever.
@@ -649,6 +707,7 @@ int main()
 {
     OS_Init();
 	Task_Create_Idle();
+	Task_Create_System(Task_Init, 0);
     Task_Create_RR(Pong, 0);
     Task_Create_RR(Ping, 0);
     setupTimer();
