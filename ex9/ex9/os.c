@@ -82,7 +82,8 @@ extern void Enter_Kernel();
 typedef enum process_states {
     DEAD = 0,
     READY,
-    RUNNING
+    RUNNING,
+	WAITING
 } PROCESS_STATES;
 
 /**
@@ -96,7 +97,8 @@ typedef enum kernel_request_type {
 } KERNEL_REQUEST_TYPE;
 
 typedef enum priority_levels {
-    ROUND_ROBIN = 0,
+	IDLE = 0,
+    ROUND_ROBIN,
     PERIODIC,
     SYSTEM
 } PRIORITY_LEVELS;
@@ -118,6 +120,9 @@ typedef struct ProcessDescriptor
 	TICK period;
 	TICK wcet;
 	TICK offset;
+	TICK run_length;
+	TICK time_until_run;
+	TICK last_run_time;
 } PD;
 
 /**
@@ -127,6 +132,7 @@ typedef struct ProcessDescriptor
 static PD round_robin_tasks[MAXPROCESS];
 static PD system_tasks[MAXPROCESS];
 static PD periodic_tasks[MAXPROCESS];
+static PD idle_task;
 
 /**
   * The process descriptor of the currently RUNNING task.
@@ -158,7 +164,11 @@ volatile static unsigned int NextP_Sys;
 /** 1 if kernel has been started; 0 otherwise. */
 volatile uint8_t KernelActive;
 
+// index of pids used so far
 volatile uint16_t pid_index;
+
+// number of TICKs passed so far since OS start - wraps around at 65535
+volatile uint16_t tick_count;
 
 /** number of tasks created so far */
 volatile static unsigned int Tasks;
@@ -221,6 +231,9 @@ static void Kernel_Create_Task(voidfuncptr f, unsigned int priority, uint16_t pi
 
     switch (priority)
     {
+	case IDLE:
+		Kernel_Create_Task_At(&idle_task, f, pid);
+		return;
     case ROUND_ROBIN:
         queue = round_robin_tasks;
         break;
@@ -311,6 +324,8 @@ static void Dispatch()
         }
         NextP_RR = (NextP_RR + 1) % MAXPROCESS;
     }
+	
+	Cp = &(idle_task);
 
     //while (round_robin_tasks[NextP_RR].state != READY)
     //{
@@ -344,6 +359,7 @@ static void Next_Kernel_Request()
         CurrentSp = Cp->sp;
         Exit_Kernel(); /* or CSwitch() */
 
+		tick_count++;
         /* if this task makes a system call, it will return to here! */
 
         /* save the Cp's stack pointer */
@@ -372,10 +388,19 @@ static void Next_Kernel_Request()
     }
 }
 
+void idle()
+{
+	for (;;);
+}
+
 /*================
   * RTOS  API  and Stubs
   *================
   */
+
+TICK Now() {
+	return (TICK)tick_count;
+}
 
 /**
   * This function initializes the RTOS and must be called before any other
@@ -391,6 +416,7 @@ void OS_Init()
     NextP_RR = 0;
     NextP_Per = 0;
     NextP_Sys = 0;
+	tick_count = 0;
     //Reminder: Clear the memory for the task on creation.
     for (x = 0; x < MAXPROCESS; x++)
     {
@@ -452,15 +478,15 @@ PID Task_Create_RR(voidfuncptr f, int arg)
         Cp->request = CREATE;
         Cp->priority = ROUND_ROBIN;
         Cp->code = f;
-        Cp->pid = arg;
+        Cp->pid = pid_index++;
         Enter_Kernel();
     }
     else
     {
         /* call the RTOS function directly */
-        Kernel_Create_Task(f, ROUND_ROBIN, arg);
+        Kernel_Create_Task(f, ROUND_ROBIN, pid_index++);
     }
-	return (PID)arg;
+	return (PID)pid_index;
 }
 
 PID Task_Create_Periodic(voidfuncptr f, int arg, TICK period, TICK wcet, TICK offset)
@@ -475,10 +501,12 @@ PID Task_Create_Periodic(voidfuncptr f, int arg, TICK period, TICK wcet, TICK of
 		Cp->wcet = wcet;
 		Cp->offset = offset;
         Cp->code = f;
-        Cp->pid = arg;
+        Cp->pid = pid_index++;
+		Cp->run_length = 0;
+		Cp->time_until_run = offset;
         Enter_Kernel();
     }
-	return (PID) arg;
+	return (PID)pid_index;
 }
 
 PID Task_Create_System(voidfuncptr f, int arg)
@@ -489,16 +517,22 @@ PID Task_Create_System(voidfuncptr f, int arg)
         Cp->request = CREATE;
         Cp->priority = SYSTEM;
         Cp->code = f;
-        Cp->pid = arg;
+        Cp->pid = pid_index++;
         Enter_Kernel();
     }
     else
     {
         /* call the RTOS function directly */
-        Kernel_Create_Task(f, SYSTEM, arg);
+        Kernel_Create_Task(f, SYSTEM, pid_index++);
     }
-	return (PID)arg;
+	return (PID)pid_index;
 }
+
+void Task_Create_Idle()
+{
+	Kernel_Create_Task(&idle, IDLE, pid_index++);
+}
+
 
 /**
   * The calling task gives up its share of the processor voluntarily.
@@ -549,7 +583,7 @@ void Ping()
         //LED on
         PORTB = 0xff;
 
-        for (y = 0; y < 32; ++y)
+        for (y = 0; y < 132; ++y)
         {
             for (x = 0; x < 32000; ++x)
             {
@@ -607,11 +641,6 @@ void Pong()
     }
 }
 
-void idle()
-{
-    for (;;);
-}
-
 /**
   * This function creates two cooperative tasks, "Ping" and "Pong". Both
   * will run forever.
@@ -619,8 +648,9 @@ void idle()
 int main()
 {
     OS_Init();
-    Task_Create_RR(Pong, pid_index++);
-    Task_Create_RR(Ping, pid_index++);
+	Task_Create_Idle();
+    Task_Create_RR(Pong, 0);
+    Task_Create_RR(Ping, 0);
     setupTimer();
     OS_Start();
 }

@@ -124,12 +124,6 @@ unsigned int Now();  // number of milliseconds since the RTOS boots.
  *==================================================================  
  */  
   
- /*   
-  * inline assembly code to disable/enable maskable interrupts   
-  * (N.B. Use with caution.)  
-  */  
-#define OS_DI()    asm(" sei ")  /* disable all interrupts */  
-#define OS_EI()    asm(" cli ")  /* enable all interrupts */  
 
 
 /**
