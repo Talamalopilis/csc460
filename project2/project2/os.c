@@ -295,7 +295,9 @@ static void check_states(){
 					q->msg_pid = i;
 					q->msg = p->msg;
 					q->state = READY;
+					q->request = NONE;
 					p->state = RPYBLOCK;
+					p->request = WAITING;
 				}
 			}
 		}
@@ -424,7 +426,7 @@ static void Next_Kernel_Request()
         case NEXT:
         case NONE:
             /* NONE could be caused by a timer interrupt */
-            //Cp->state = READY;
+            Cp->state = READY;
             Dispatch();
             break;
         case TERMINATE:
@@ -645,7 +647,9 @@ void Msg_Send(PID id, MTYPE t, unsigned int *v)
 		pid_to_pd[id]->msg = *v;
 		pid_to_pd[id]->msg_pid = Cp->pid;
 		pid_to_pd[id]->state = READY;
+		pid_to_pd[id]->request = NONE;
 		Cp->state = RPYBLOCK;
+		Cp->request = WAITING;
 	}
 	else
 	{
@@ -653,6 +657,7 @@ void Msg_Send(PID id, MTYPE t, unsigned int *v)
 		Cp->mask = (MASK)t;
 		Cp->msg = *v;
 		Cp->state = SNDBLOCK;
+		Cp->request = WAITING;
 	}
 	Enter_Kernel();
 }
@@ -662,9 +667,11 @@ PID Msg_Recv(MASK m, unsigned int *v)
 	Disable_Interrupt();
 	Cp->mask = m;
 	Cp->state = RCVBLOCK;
+	Cp->request = WAITING;
 	Enter_Kernel();
 
 	*v = Cp->msg;
+	pid_to_pd[Cp->msg_pid]->request = WAITING;
 	pid_to_pd[Cp->msg_pid]->state = RPYBLOCK;
 	return Cp->msg_pid;
 }
@@ -674,8 +681,11 @@ void Msg_Rply(PID id, unsigned int r)
 	Disable_Interrupt();
 	// kind of assuming that the only way to get to reply is from a successful send
 	// therefore the sender must already be in RPYBLOCK, no need to check.
-	pid_to_pd[id]->msg = r;
-	pid_to_pd[id]->state = READY;
+	if (pid_to_pd[id]->state == RPYBLOCK){
+		pid_to_pd[id]->msg = r;
+		pid_to_pd[id]->state = READY;
+		pid_to_pd[id]->request = NONE;
+	}
 	Enter_Kernel();
 }
 
@@ -687,6 +697,7 @@ void Msg_ASend(PID id, MTYPE t, unsigned int v)
 		pid_to_pd[id]->msg = v;
 		pid_to_pd[id]->msg_pid = 0;
 		pid_to_pd[id]->state = READY;
+		pid_to_pd[id]->request = NONE;
 	}
 	Enter_Kernel();
 }
@@ -726,7 +737,6 @@ void Ping()
     {
         //LED on
 		int a = 5;
-		Msg_Send(2, 1, &a);
         PORTB = 0xff;
         for (y = 0; y < 32; ++y)
         {
@@ -738,14 +748,15 @@ void Ping()
 
         //LED off
         PORTB = 0;
+		Msg_Send(2, 1, &a);
 
         for (y = 0; y < 32; ++y)
         {
             for (x = 0; x < 32000; ++x)
             {
-                asm("");
+	            asm("");
             }
-        }
+            }
 
         /* printf( "*" );  */
     }
@@ -767,10 +778,10 @@ void Pong()
         PORTC = 0xff;
         for (y = 0; y < 64; ++y)
         {
-            //for (x = 0; x < 32000; ++x)
-            //{
-                //asm("");
-            //}
+            for (x = 0; x < 32000; ++x)
+            {
+                asm("");
+            }
         }
 
         //LED off
@@ -779,10 +790,10 @@ void Pong()
 
         for (y = 0; y < 64; ++y)
         {
-            //for (x = 0; x < 32000; ++x)
-            //{
-                //asm("");
-            //}
+            for (x = 0; x < 32000; ++x)
+            {
+	            asm("");
+            }
         }
 
         /* printf( "." );  */
