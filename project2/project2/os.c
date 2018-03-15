@@ -59,6 +59,7 @@ extern void Exit_Kernel(); /* this is the same as CSwitch() */
 
 /* Prototype */
 void Task_Terminate(void);
+int Match_Send(PID id, MTYPE t);
 
 /** 
   * This external function could be implemented in two ways:
@@ -83,7 +84,10 @@ typedef enum process_states {
     DEAD = 0,
     READY,
     RUNNING,
-	SUSPENDED
+	SUSPENDED,
+	SNDBLOCK,
+	RCVBLOCK,
+	RPYBLOCK
 } PROCESS_STATES;
 
 /**
@@ -124,6 +128,9 @@ typedef struct ProcessDescriptor
 	TICK run_length;
 	int16_t time_until_run;
 	TICK last_check_time;
+	uint16_t msg_pid;
+	MTYPE mask;
+	int msg;
 } PD;
 
 /**
@@ -134,6 +141,7 @@ static PD round_robin_tasks[MAXPROCESS];
 static PD system_tasks[MAXPROCESS];
 static PD periodic_tasks[MAXPROCESS];
 static PD idle_task;
+static PD *pid_to_pd[MAXPROCESS] = {NULL};
 
 /**
   * The process descriptor of the currently RUNNING task.
@@ -184,6 +192,7 @@ volatile static unsigned int Tasks;
  */
 void Kernel_Create_Task_At(PD *p, voidfuncptr f, uint16_t pid)
 {
+	pid_to_pd[pid] = p;
     unsigned char *sp;
 
     //Changed -2 to -1 to fix off by one error.
@@ -276,6 +285,23 @@ static void Kernel_Create_Task(voidfuncptr f, unsigned int priority, uint16_t pi
     Kernel_Create_Task_At(&(queue[x]), f, pid);
 }
 
+static void check_states(){
+	for (int i = 0; i < MAXPROCESS; i++){
+		if (pid_to_pd[i] != NULL){
+			PD *p = pid_to_pd[i];
+			if (p->state == SNDBLOCK){
+				if (Match_Send(p->msg_pid, (MTYPE)p->mask)){
+					PD *q = pid_to_pd[p->msg_pid];
+					q->msg_pid = i;
+					q->msg = p->msg;
+					q->state = READY;
+					p->state = RPYBLOCK;
+				}
+			}
+		}
+	}
+}
+
 /**
   * This internal kernel function is a part of the "scheduler". It chooses the 
   * next task to run, i.e., Cp.
@@ -285,6 +311,7 @@ static void Dispatch()
     /* find the next READY task
        * Note: if there is no READY task, then this will loop forever!.
        */
+	check_states();
     int i;
 
     for (i = 0; i < MAXPROCESS; ++i)
@@ -397,7 +424,7 @@ static void Next_Kernel_Request()
         case NEXT:
         case NONE:
             /* NONE could be caused by a timer interrupt */
-            Cp->state = READY;
+            //Cp->state = READY;
             Dispatch();
             break;
         case TERMINATE:
@@ -601,6 +628,57 @@ void Task_Next()
     }
 }
 
+int Match_Send(PID id, MTYPE t){
+	if (pid_to_pd[id]->state == RCVBLOCK){
+		if ((t & pid_to_pd[id]->mask) != 0){
+			return 1;
+		}
+	}
+	return 0;
+};
+
+void Msg_Send(PID id, MTYPE t, unsigned int *v)
+{	
+	Disable_Interrupt();
+	if (Match_Send(id, t))
+	{
+		pid_to_pd[id]->msg = *v;
+		pid_to_pd[id]->msg_pid = Cp->pid;
+		pid_to_pd[id]->state = READY;
+		Cp->state = RPYBLOCK;
+	}
+	else
+	{
+		Cp->msg_pid = id;
+		Cp->mask = (MASK)t;
+		Cp->msg = *v;
+		Cp->state = SNDBLOCK;
+	}
+	Enter_Kernel();
+}
+
+PID Msg_Recv(MASK m, unsigned int *v)
+{
+	Disable_Interrupt();
+	Cp->mask = m;
+	Cp->state = RCVBLOCK;
+	Enter_Kernel();
+
+	*v = Cp->msg;
+	pid_to_pd[Cp->msg_pid]->state = RPYBLOCK;
+	return Cp->msg_pid;
+}
+
+void Msg_Rply(PID id, unsigned int r)
+{
+	Disable_Interrupt();
+	// kind of assuming that the only way to get to reply is from a successful send
+	// therefore the sender must already be in RPYBLOCK, no need to check.
+	pid_to_pd[id]->msg = r;
+	pid_to_pd[id]->state = READY;
+	Enter_Kernel();
+}
+
 /**
   * The calling task terminates itself.
   */
@@ -635,8 +713,9 @@ void Ping()
     for (;;)
     {
         //LED on
-        //PORTB = 0xff;
-
+		int a = 5;
+		Msg_Send(2, 1, &a);
+        PORTB = 0xff;
         for (y = 0; y < 32; ++y)
         {
             for (x = 0; x < 32000; ++x)
@@ -646,7 +725,7 @@ void Ping()
         }
 
         //LED off
-        //PORTB = 0;
+        PORTB = 0;
 
         for (y = 0; y < 32; ++y)
         {
@@ -671,24 +750,27 @@ void Pong()
     for (;;)
     {
         //LED on
+		int a = 3;
+		uint16_t pid = Msg_Recv(0xff, &a);
         PORTC = 0xff;
         for (y = 0; y < 64; ++y)
         {
-            for (x = 0; x < 32000; ++x)
-            {
-                asm("");
-            }
+            //for (x = 0; x < 32000; ++x)
+            //{
+                //asm("");
+            //}
         }
 
         //LED off
+		Msg_Rply(pid,0);
         PORTC = 0;
 
         for (y = 0; y < 64; ++y)
         {
-            for (x = 0; x < 32000; ++x)
-            {
-                asm("");
-            }
+            //for (x = 0; x < 32000; ++x)
+            //{
+                //asm("");
+            //}
         }
 
         /* printf( "." );  */
