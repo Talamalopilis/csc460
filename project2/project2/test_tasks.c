@@ -1,16 +1,17 @@
 #define TESTING 1 // testing flag; disable if not testing
+#define F_CPU 16000000UL
+
+#ifdef TESTING
 
 #include <avr/io.h>
 #include <string.h>
-#include "uart.h"
+#include "UART/usart.h"
 #include "os.h"
-
-#ifdef TESTING
 
 #define BUFFER_SIZE 1024
 
 unsigned char results[BUFFER_SIZE]; // use 1 kb of space for test results
-unsigned char* cur = results; // pointer to current character index in buffer
+unsigned char * cur = results; // pointer to current character index in buffer
 
 void basic_RR_test();
 void write_out();
@@ -22,7 +23,7 @@ void test_main() {
 
 void basic_RR_test() {
 	int i;
-	for(i = 0; i < 10; ++i) {
+	for(i = 'a'; i < 10; ++i) {
 		*cur++ = i % 0xff;
 	}
 	Task_Create_System(write_out, 0);
@@ -30,15 +31,9 @@ void basic_RR_test() {
 
 void write_out() {
 	unsigned char * p;
-	uart0_init(9600);
-	uart0_puts("test");
+	uart_init(BAUD_CALC(9600));
 	for(p = results; p < cur; ++p) {
-		char c = *p;
-		if(!c) {
-			uart0_putc(c);
-		} else {
-			uart0_putc('\n');
-		}
+		uart0_putc(*p);
 	}
 }
 
