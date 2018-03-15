@@ -131,6 +131,7 @@ typedef struct ProcessDescriptor
 	uint16_t msg_pid;
 	MTYPE mask;
 	int msg;
+	int arg;
 } PD;
 
 /**
@@ -542,6 +543,7 @@ PID Task_Create_RR(voidfuncptr f, int arg)
         round_robin_tasks[x].priority = ROUND_ROBIN;
         round_robin_tasks[x].code = f;
         round_robin_tasks[x].pid = pid_index++;
+		round_robin_tasks[x].arg = arg;
 		Kernel_Create_Task_At(&round_robin_tasks[x], f, pid_index);
         Enter_Kernel();
     }
@@ -572,6 +574,7 @@ PID Task_Create_Periodic(voidfuncptr f, int arg, TICK period, TICK wcet, TICK of
 		periodic_tasks[x].offset = offset;
         periodic_tasks[x].code = f;
         periodic_tasks[x].pid = pid_index++;
+		periodic_tasks[x].arg = arg;
 		periodic_tasks[x].run_length = 0;
 		periodic_tasks[x].time_until_run = offset;
 		periodic_tasks[x].last_check_time = Now();
@@ -596,6 +599,7 @@ PID Task_Create_System(voidfuncptr f, int arg)
         system_tasks[x].priority = SYSTEM;
         system_tasks[x].code = f;
         system_tasks[x].pid = pid_index++;
+		system_tasks[x].arg = arg;
 		Kernel_Create_Task_At(&system_tasks[x], f, pid_index);
         Enter_Kernel();
     }
@@ -628,6 +632,11 @@ void Task_Next()
 		}
         Enter_Kernel();
     }
+}
+
+int Task_GetArg(void)
+{
+	return Cp->arg;
 }
 
 int Match_Send(PID id, MTYPE t){
