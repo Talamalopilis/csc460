@@ -679,6 +679,18 @@ void Msg_Rply(PID id, unsigned int r)
 	Enter_Kernel();
 }
 
+void Msg_ASend(PID id, MTYPE t, unsigned int v)
+{
+	Disable_Interrupt();
+	if (Match_Send(id, t))
+	{
+		pid_to_pd[id]->msg = v;
+		pid_to_pd[id]->msg_pid = 0;
+		pid_to_pd[id]->state = READY;
+	}
+	Enter_Kernel();
+}
+
 /**
   * The calling task terminates itself.
   */
