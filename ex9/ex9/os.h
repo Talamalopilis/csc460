@@ -4,7 +4,7 @@
    
 #define MAXTHREAD     16       
 #define WORKSPACE     256   // in bytes, per THREAD
-#define MSECPERTICK   10   // resolution of a system TICK in milliseconds
+#define MSECPERTICK   100   // resolution of a system TICK in milliseconds
 
 #ifndef NULL
 #define NULL          0   /* undefined */

@@ -163,13 +163,15 @@ volatile static unsigned int NextP_Per;
 volatile static unsigned int NextP_Sys;
 
 /** 1 if kernel has been started; 0 otherwise. */
+// this variable is not static so it is accessible from assembly - the user code
+// should not attempt to touch this variable
 volatile uint8_t KernelActive;
 
 // index of pids used so far
-volatile uint16_t pid_index;
+static volatile uint16_t pid_index;
 
 // number of TICKs passed so far since OS start - wraps around at 65535
-volatile uint16_t tick_count;
+static volatile uint16_t tick_count;
 
 /** number of tasks created so far */
 volatile static unsigned int Tasks;
@@ -214,12 +216,20 @@ void Kernel_Create_Task_At(PD *p, voidfuncptr f, uint16_t pid)
 
     p->sp = sp;  /* stack pointer into the "workSpace" */
     p->code = f; /* function to be executed as a task */
-    p->request = NONE;
     p->pid = pid;
 
     /*----END of NEW CODE----*/
 
-    p->state = READY;
+	
+    
+	
+	if(p->priority == PERIODIC) {
+		p->request = WAITING;
+		p->state = SUSPENDED;
+	} else {
+		p->request = NONE;
+		p->state = READY;
+	}
 }
 
 /**
@@ -472,7 +482,7 @@ void setupTimer()
     TCCR4B |= (1 << CS42);
 
     //set TOP value (0.01 seconds)
-    OCR4A = 625;
+    OCR4A = 6250;
 
     //Enable interrupt A for timer 3
     TIMSK4 |= (1 << OCIE4A);
@@ -534,7 +544,7 @@ PID Task_Create_Periodic(voidfuncptr f, int arg, TICK period, TICK wcet, TICK of
         periodic_tasks[x].code = f;
         periodic_tasks[x].pid = pid_index++;
 		periodic_tasks[x].run_length = 0;
-		periodic_tasks[x].time_until_run = offset + period;
+		periodic_tasks[x].time_until_run = offset;
 		periodic_tasks[x].last_check_time = Now();
 		Kernel_Create_Task_At(&periodic_tasks[x], f, pid_index);
         Enter_Kernel();
@@ -625,7 +635,7 @@ void Ping()
     for (;;)
     {
         //LED on
-       // PORTB = 0xff;
+        //PORTB = 0xff;
 
         for (y = 0; y < 32; ++y)
         {
@@ -695,7 +705,7 @@ void Pong_Period()
 
 void Task_Init()
 {
-	Task_Create_Periodic(Pong_Period, 0, 100, 10, 0);
+	Task_Create_Periodic(Pong_Period, 0, 60, 10, 0);
 }
 
 
