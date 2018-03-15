@@ -2,6 +2,9 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include "os.h"
+#include "uart.h"
+
+
 
 /**
  * \file active.c
@@ -35,6 +38,9 @@
 #define WORKSPACE 256
 #define MAXPROCESS 4
 
+// testing flag, comment out if not testing
+#define TESTING 1
+
 /*===========
   * RTOS Internal
   *===========
@@ -56,6 +62,12 @@
   */
 extern void CSwitch();
 extern void Exit_Kernel(); /* this is the same as CSwitch() */
+
+#ifdef TESTING
+extern void test_main();
+#endif
+
+
 
 /* Prototype */
 void Task_Terminate(void);
@@ -745,7 +757,9 @@ void Ping()
     for (;;)
     {
         //LED on
-		int a = 5;
+
+		unsigned int a = 5;
+		Msg_Send(2, 1, &a);
         PORTB = 0xff;
         for (y = 0; y < 32; ++y)
         {
@@ -782,7 +796,7 @@ void Pong()
     for (;;)
     {
         //LED on
-		int a = 3;
+		unsigned int a = 3;
 		uint16_t pid = Msg_Recv(0xff, &a);
         PORTC = 0xff;
         for (y = 0; y < 64; ++y)
@@ -829,11 +843,19 @@ void Task_Init()
   */
 int main()
 {
+	uart0_init(9600);
+	uart0_puts("test");
     OS_Init();
 	Task_Create_Idle();
-	Task_Create_System(Task_Init, 0);
-    Task_Create_RR(Pong, 0);
-    Task_Create_RR(Ping, 0);
+	// Task_Create_System(Task_Init, 0);
+    // Task_Create_RR(Pong, 0);
+    // Task_Create_RR(Ping, 0);
+	#ifdef TESTING
+	Task_Create_System(test_main, 0);
+	#endif
+	#ifndef TESTING
+	//Task_Create_System() // application task create
+	#endif
     setupTimer();
     OS_Start();
 }
