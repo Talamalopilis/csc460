@@ -1,9 +1,10 @@
+#define F_CPU 16000000UL
+
 #include <string.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include "os.h"
-#include "uart.h"
-
+#include "UART/usart.h"
 
 
 /**
@@ -821,8 +822,6 @@ void Task_Init()
   */
 int main()
 {
-	uart0_init(9600);
-	uart0_puts("test");
     OS_Init();
 	Task_Create_Idle();
 	// Task_Create_System(Task_Init, 0);
