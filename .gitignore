@@ -1,3 +1,11 @@
 
-timer/timer/.vs/timer/v14/.atsuo
-timer/timer/.vs/timer/v14/.atsuo
+*.o
+*.elf
+*.hex
+*.map
+*.srec
+*.d
+*.atsuo
+**/**/Debug
+**/**/**/Debug
+
