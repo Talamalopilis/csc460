@@ -18,6 +18,13 @@ void basic_RR_test();
 void write_out();
 void interleaved_periodic_task_1();
 void interleaved_periodic_task_2();
+void priority_test_setup();
+void system_task_test();
+void periodic_task_test();
+void rr_task_test();
+void rr_test_1();
+void rr_test_2();
+void rr_sched_test();
 
 void test_main() {
 	cur = 0;
@@ -26,6 +33,8 @@ void test_main() {
 }
 
 /* 
+	just making sure UART capabilities work and testing if RR
+	tasks run at all
 	expected trace for this is
 	a, b, c, d, e, f, g, h, i, j
 */
@@ -41,6 +50,7 @@ void basic_RR_test() {
 
 
 /*
+	periodic task interleaving test
 	expected trace for this test is
 	a, b, b, a, b, b, a, b, b
 */
@@ -56,6 +66,62 @@ void interleaved_periodic_task_1() {
 void interleaved_periodic_task_2() {
 	uint8_t i;
 	for(i = 0; i < 6; ++i) {
+		results[cur++] = 'b';
+		Task_Next();
+	}
+	results[cur++] = 0;
+	Task_Create_System(priority_test_setup, 0);
+}
+
+/*
+	task priority test
+	expected trace is
+	a, b, c
+*/
+
+void priority_test_setup() {
+	Task_Create_System(system_task_test, 0);
+	Task_Create_Period(periodic_task_test, 0, 10, 0, 0);
+	Task_Create_RR(rr_task_test, 0);
+}
+
+void system_task_test() {
+	results[cur++] = 'a';
+}
+
+void periodic_task_test() {
+	results[cur++] = 'b';
+}
+
+void rr_task_test() {
+	results[cur++] = 'c';
+	results[cur++] = 0;
+	Task_Create_System(rr_sched_test, 0);
+}
+
+/*
+	checks if two tasks of the same priority
+	level interleave properly
+	expected trace is
+	a, b, a, b, a, b, a, b, a, b
+*/
+
+void rr_sched_test() {
+	Task_Create_RR(rr_test_1, 0);
+	Task_Create_RR(rr_test_2, 0);
+}
+
+void rr_test_1() {
+	int i;
+	for(i = 0; i < 5; ++i) {
+		results[cur++] = 'a';
+		Task_Next();
+	}
+}
+
+void rr_test_2() {
+	int i;
+	for(i = 0; i < 5; ++i) {
 		results[cur++] = 'b';
 		Task_Next();
 	}

@@ -123,6 +123,7 @@ SPL    = 0x3D
 		.global Enter_Kernel_Interrupt
         .extern  KernelSp
         .extern  CurrentSp
+		.extern tick_count
 /*
   * The actual CSwitch() code begins here.
   *
@@ -203,6 +204,18 @@ Disable_Interrupt_Probe:
 	pop r16
 	ret
 
+inc_tick_count:
+	push r24
+	push r25
+	lds r24, tick_count
+	lds r25, tick_count+1
+	adiw r24, 0x01
+	sts  tick_count+1, r25
+	sts tick_count, r24
+	pop r25
+	pop r24
+	ret
+
 // interrupt triggered when kernel hasn't finished booting
 Kernel_Inactive:
 	pop r0
@@ -213,6 +226,7 @@ Kernel_Inactive:
 
 Enter_Kernel_Interrupt:
 	call Enable_Interrupt_Probe
+	call inc_tick_count
 	lds r1, KernelActive
 	tst r1
 	breq Kernel_Inactive

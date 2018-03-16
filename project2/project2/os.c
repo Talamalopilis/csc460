@@ -156,7 +156,7 @@ static PD round_robin_tasks[MAXPROCESS];
 static PD system_tasks[MAXPROCESS];
 static PD periodic_tasks[MAXPROCESS];
 static PD idle_task;
-static PD *pid_to_pd[MAXPROCESS * 3 + 1] = {NULL};
+static PD *pid_to_pd[MAXPROCESS * 3 + 10] = {NULL}; // HACK MAKE SURE TO FIX
 
 /**
   * The process descriptor of the currently RUNNING task.
@@ -194,7 +194,7 @@ volatile uint8_t KernelActive;
 static volatile uint16_t pid_index;
 
 // number of TICKs passed so far since OS start - wraps around at 65535
-static volatile uint16_t tick_count;
+volatile uint16_t tick_count;
 
 /** number of tasks created so far */
 volatile static unsigned int Tasks;
@@ -424,7 +424,7 @@ static void Next_Kernel_Request()
         CurrentSp = Cp->sp;
         Exit_Kernel(); /* or CSwitch() */
 
-		tick_count++;
+		// tick_count++;
         /* if this task makes a system call, it will return to here! */
 
         /* save the Cp's stack pointer */
