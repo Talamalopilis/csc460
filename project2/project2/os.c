@@ -3,6 +3,7 @@
 #include <string.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <util/delay.h>
 #include "os.h"
 #include "UART/usart.h"
 
@@ -457,7 +458,7 @@ static void Next_Kernel_Request()
 
 void idle()
 {
-	for (;;);
+	for(;;);
 }
 
 /*================
@@ -568,7 +569,7 @@ PID Task_Create_RR(voidfuncptr f, int arg)
 	return (PID)pid_index;
 }
 
-PID Task_Create_Periodic(voidfuncptr f, int arg, TICK period, TICK wcet, TICK offset)
+PID Task_Create_Period(voidfuncptr f, int arg, TICK period, TICK wcet, TICK offset)
 {
 	int x;
 	for (x = 0; x < MAXPROCESS; x++)
@@ -832,7 +833,7 @@ void Pong_Period()
 
 void Task_Init()
 {
-	Task_Create_Periodic(Pong_Period, 0, 60, 10, 0);
+	Task_Create_Period(Pong_Period, 0, 60, 10, 0);
 }
 
 
