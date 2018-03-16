@@ -25,6 +25,13 @@ void rr_task_test();
 void rr_test_1();
 void rr_test_2();
 void rr_sched_test();
+void srr_basic_test();
+void srr_sender();
+void srr_reciever();
+void srr_async_test();
+void asrr_sender();
+void asrr_reciever();
+
 
 void test_main() {
 	cur = 0;
@@ -44,6 +51,7 @@ void basic_RR_test() {
 		results[cur++] = i;
 	}
 	results[cur++] = 0;
+	//Task_Create_System(srr_basic_test, 0);
 	Task_Create_Period(interleaved_periodic_task_1,0,10,100,0);
 	Task_Create_Period(interleaved_periodic_task_2,0,5,100,0);
 }
@@ -126,7 +134,58 @@ void rr_test_2() {
 		Task_Next();
 	}
 	results[cur++] = 0;
+	Task_Create_System(srr_basic_test, 0);
+}
+
+// trace expected to be aba
+void srr_basic_test(){
+	PID to = Task_Create_RR(srr_reciever, 0);
+	Task_Create_RR(srr_sender, to);
+}
+
+void srr_sender(){
+	PID to = Task_GetArg();
+	results[cur++] = 'a';
+	unsigned int msg = 'b';
+	Msg_Send(to, 1, &msg);
+	results[cur++] = 'a';
+	results[cur++] = 0;
+	Task_Create_System(srr_async_test, 0);
+}
+
+void srr_reciever(){
+	unsigned int msg;
+	PID from = Msg_Recv(0xff, &msg);
+	results[cur++] = msg;
+	Msg_Rply(from, 0);
+}
+
+// expected trace is aaca
+void srr_async_test(){
+	PID to = Task_Create_RR(asrr_reciever, 0);
+	Task_Create_RR(asrr_sender, to);
+
+}
+
+void asrr_sender(){
+	PID to = Task_GetArg();
+	results[cur++] = 'a';
+	unsigned int msg = 'b';
+	Msg_ASend(0,1,msg); //sending to task obviously not receiving
+	results[cur++] = 'a';
+	Task_Next();
+	msg = 'c';
+	Msg_ASend(to,1,msg);
+	Task_Next();
+	results[cur++] = 'a';
+	results[cur++] = 0;
 	Task_Create_RR(write_out, 0);
+}
+
+void asrr_reciever(){
+	unsigned int msg;
+	Msg_Recv(0xff, &msg);
+	results[cur++] = msg;
 }
 
 void write_out() {
