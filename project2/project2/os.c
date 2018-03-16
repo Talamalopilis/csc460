@@ -155,7 +155,7 @@ static PD round_robin_tasks[MAXPROCESS];
 static PD system_tasks[MAXPROCESS];
 static PD periodic_tasks[MAXPROCESS];
 static PD idle_task;
-static PD *pid_to_pd[MAXPROCESS] = {NULL};
+static PD *pid_to_pd[MAXPROCESS * 3 + 1] = {NULL};
 
 /**
   * The process descriptor of the currently RUNNING task.
@@ -309,8 +309,8 @@ static void check_states(){
 					q->msg_pid = i;
 					q->msg = p->msg;
 					q->state = READY;
-					q->request = NONE;
 					p->state = RPYBLOCK;
+					q->request = NONE;
 					p->request = WAITING;
 				}
 			}
@@ -587,10 +587,10 @@ PID Task_Create_Periodic(voidfuncptr f, int arg, TICK period, TICK wcet, TICK of
 		periodic_tasks[x].offset = offset;
         periodic_tasks[x].code = f;
         periodic_tasks[x].pid = pid_index++;
-		periodic_tasks[x].arg = arg;
 		periodic_tasks[x].run_length = 0;
 		periodic_tasks[x].time_until_run = offset;
 		periodic_tasks[x].last_check_time = Now();
+		periodic_tasks[x].arg = arg;
 		Kernel_Create_Task_At(&periodic_tasks[x], f, pid_index);
         Enter_Kernel();
     }
@@ -758,7 +758,6 @@ void Ping()
     for (;;)
     {
         //LED on
-
 		unsigned int a = 5;
 		Msg_Send(2, 1, &a);
         PORTB = 0xff;
@@ -772,15 +771,14 @@ void Ping()
 
         //LED off
         PORTB = 0;
-		Msg_Send(2, 1, &a);
 
         for (y = 0; y < 32; ++y)
         {
             for (x = 0; x < 32000; ++x)
             {
-	            asm("");
+                asm("");
             }
-            }
+        }
 
         /* printf( "*" );  */
     }
@@ -792,7 +790,7 @@ void Ping()
   */
 void Pong()
 {
-    int x, y;
+    int y;
     DDRC = 0xff;
     for (;;)
     {
@@ -802,10 +800,10 @@ void Pong()
         PORTC = 0xff;
         for (y = 0; y < 64; ++y)
         {
-            for (x = 0; x < 32000; ++x)
-            {
-                asm("");
-            }
+            //for (x = 0; x < 32000; ++x)
+            //{
+                //asm("");
+            //}
         }
 
         //LED off
@@ -814,10 +812,10 @@ void Pong()
 
         for (y = 0; y < 64; ++y)
         {
-            for (x = 0; x < 32000; ++x)
-            {
-	            asm("");
-            }
+            //for (x = 0; x < 32000; ++x)
+            //{
+                //asm("");
+            //}
         }
 
         /* printf( "." );  */
