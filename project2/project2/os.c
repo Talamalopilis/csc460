@@ -39,6 +39,7 @@
 
 #define WORKSPACE 256
 #define MAXPROCESS 4
+#define MAXTHREADS MAXPROCESS * 3 + 1
 
 // testing flag, comment out if not testing
 #define TESTING 1
