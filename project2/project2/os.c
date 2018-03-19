@@ -526,7 +526,7 @@ void setupTimer()
     TCCR4B |= (1 << CS42);
 
     //set TOP value (0.01 seconds)
-    OCR4A = 6250;
+    OCR4A = 625;
 
     //Enable interrupt A for timer 3
     TIMSK4 |= (1 << OCIE4A);
