@@ -355,19 +355,19 @@ static void Dispatch()
         if (periodic_tasks[NextP_Per].state == READY)
         {
             Cp = &(periodic_tasks[NextP_Per]);
-			Cp->time_until_run -= Now() - Cp->last_check_time; // check if overflow affects
-			Cp->run_length += Now() - Cp->last_check_time;
+			Cp->time_until_run -= Now() - Cp->last_check_time;
 			Cp->last_check_time = Now();
 			if(Cp->run_length > Cp->wcet) {
 				OS_Abort(WCET_EXCEEDED);
 			}
+            Cp->run_length += 1;
 			CurrentSp = Cp->sp;
 			Cp->state = RUNNING;
 			Cp->request = NONE;
             return;
         } else if(periodic_tasks[NextP_Per].state == SUSPENDED) {
 			Cp = &(periodic_tasks[NextP_Per]);
-			Cp->time_until_run -= Now() - Cp->last_check_time; // check if overflow affects
+			Cp->time_until_run -= Now() - Cp->last_check_time;
 			Cp->last_check_time = Now();
 			if(Cp->time_until_run <= 0) {
 				Cp->run_length = 0;
@@ -482,7 +482,7 @@ void OS_Abort(unsigned int error) {
 	DDRB = 0xff;
 	PORTB = 0;
 
-	for(j = 0; j < error; ++j) {
+	for(j = 0; j < 3; ++j) {
 		for(i = 0; i < error; ++i) {
 			PORTB = 0xff;
 			_delay_ms(100);
