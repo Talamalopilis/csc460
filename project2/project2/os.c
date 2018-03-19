@@ -107,7 +107,8 @@ typedef enum process_states {
 typedef enum error_types {
 	NO_ERROR = 0,
 	TOO_MANY_TASKS,
-	WCET_EXCEEDED
+	WCET_EXCEEDED,
+	PID_NOT_FOUND
 } ERROR_TYPES;
 
 /**
@@ -162,7 +163,7 @@ static PD round_robin_tasks[MAXPROCESS];
 static PD system_tasks[MAXPROCESS];
 static PD periodic_tasks[MAXPROCESS];
 static PD idle_task;
-static PD *pid_to_pd[MAXPROCESS * 3 + 10] = {NULL}; // HACK MAKE SURE TO FIX
+static PD *pid_to_pd[MAXPROCESS * 3 + 10] = {NULL};
 
 /**
   * The process descriptor of the currently RUNNING task.
@@ -501,6 +502,7 @@ void OS_Abort(unsigned int error) {
   */
 void OS_Init()
 {
+	DDRL = 0xff;
     int x;
 
     pid_index = 0;
@@ -690,6 +692,9 @@ int Match_Send(PID id, MTYPE t){
 void Msg_Send(PID id, MTYPE t, unsigned int *v)
 {	
 	Disable_Interrupt();
+	if (pid_to_pd[id] == NULL){
+		OS_Abort(PID_NOT_FOUND);
+	}
 	if (Match_Send(id, t))
 	{
 		pid_to_pd[id]->msg = *v;
