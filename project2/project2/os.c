@@ -104,6 +104,12 @@ typedef enum process_states {
 	RPYBLOCK
 } PROCESS_STATES;
 
+typedef enum error_types {
+	NO_ERROR = 0,
+	TOO_MANY_TASKS,
+	WCET_EXCEEDED
+} ERROR_TYPES;
+
 /**
   * This is the set of kernel requests, i.e., a request code for each system call.
   */
@@ -284,8 +290,9 @@ static void Kernel_Create_Task(voidfuncptr f, unsigned int priority, uint16_t pi
         break;
     }
 
-    if (Tasks == MAXPROCESS * 3 + 1)
-        return; /* Too many task! */
+    if (Tasks >= MAXPROCESS * 3 + 1) {
+		OS_Abort(TOO_MANY_TASKS);
+	}
 
     /* find a DEAD PD that we can use  */
     for (x = 0; x < MAXPROCESS; x++)
@@ -338,7 +345,6 @@ static void Dispatch()
             Cp = &(system_tasks[NextP_Sys]);
             CurrentSp = Cp->sp;
             Cp->state = RUNNING;
-            NextP_Sys = (NextP_Sys + 1) % MAXPROCESS;
             return;
         }
         NextP_Sys = (NextP_Sys + 1) % MAXPROCESS;
@@ -353,12 +359,11 @@ static void Dispatch()
 			Cp->run_length += Now() - Cp->last_check_time;
 			Cp->last_check_time = Now();
 			if(Cp->run_length > Cp->wcet) {
-				// throw timing overflow error
+				OS_Abort(WCET_EXCEEDED);
 			}
 			CurrentSp = Cp->sp;
 			Cp->state = RUNNING;
 			Cp->request = NONE;
-            NextP_Per = (NextP_Per + 1) % MAXPROCESS;
             return;
         } else if(periodic_tasks[NextP_Per].state == SUSPENDED) {
 			Cp = &(periodic_tasks[NextP_Per]);
@@ -369,7 +374,6 @@ static void Dispatch()
 				Cp->time_until_run = Cp->period;
 				Cp->state = RUNNING;
 				Cp->request = NONE;
-				NextP_Per = (NextP_Per + 1) % MAXPROCESS;
 				return;
 			}
 		}
@@ -468,6 +472,27 @@ void idle()
 
 TICK Now() {
 	return (TICK)tick_count;
+}
+
+void OS_Abort(unsigned int error) {
+	Disable_Interrupt();
+	int i;
+	int j;
+	
+	DDRB = 0xff;
+	PORTB = 0;
+
+	for(j = 0; j < error; ++j) {
+		for(i = 0; i < error; ++i) {
+			PORTB = 0xff;
+			_delay_ms(100);
+			PORTB = 0;
+			_delay_ms(100);
+		}
+		_delay_ms(500);
+	}
+	_delay_ms(3000);
+	asm("jmp 0x00"); // jump to the first instruction, resetting system
 }
 
 /**
