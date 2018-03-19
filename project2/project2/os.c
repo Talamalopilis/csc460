@@ -108,7 +108,8 @@ typedef enum error_types {
 	NO_ERROR = 0,
 	TOO_MANY_TASKS,
 	WCET_EXCEEDED,
-	PID_NOT_FOUND
+	PID_NOT_FOUND,
+	QUEUE_SPACE_EXCEEDED
 } ERROR_TYPES;
 
 /**
@@ -291,7 +292,7 @@ static void Kernel_Create_Task(voidfuncptr f, unsigned int priority, uint16_t pi
         break;
     }
 
-    if (Tasks >= MAXPROCESS * 3 + 1) {
+    if (Tasks >= MAXTHREADS) {
 		OS_Abort(TOO_MANY_TASKS);
 	}
 
@@ -301,6 +302,9 @@ static void Kernel_Create_Task(voidfuncptr f, unsigned int priority, uint16_t pi
         if (queue[x].state == DEAD)
             break;
     }
+	
+	if(queue[x].state != DEAD)
+		OS_Abort(QUEUE_SPACE_EXCEEDED);
 	
 	queue[x].priority = priority;
 
@@ -361,7 +365,7 @@ static void Dispatch()
 			if(Cp->run_length > Cp->wcet) {
 				OS_Abort(WCET_EXCEEDED);
 			}
-            Cp->run_length += 1;
+            Cp->run_length += Now() - Cp->last_check_time;
 			CurrentSp = Cp->sp;
 			Cp->state = RUNNING;
 			Cp->request = NONE;
@@ -371,7 +375,7 @@ static void Dispatch()
 			Cp->time_until_run -= Now() - Cp->last_check_time;
 			Cp->last_check_time = Now();
 			if(Cp->time_until_run <= 0) {
-				Cp->run_length = 0;
+				Cp->run_length = 1;
 				Cp->time_until_run = Cp->period;
 				Cp->state = RUNNING;
 				Cp->request = NONE;
@@ -502,9 +506,9 @@ void OS_Abort(unsigned int error) {
   */
 void OS_Init()
 {
-	DDRL = 0xff;
     int x;
-
+	
+	DDRL = 0xff;
     pid_index = 0;
     Tasks = 0;
     KernelActive = 0;
