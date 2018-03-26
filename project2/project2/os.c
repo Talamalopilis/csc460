@@ -42,7 +42,7 @@
 #define MAXTHREADS MAXPROCESS * 3 + 1
 
 // testing flag, comment out if not testing
-#define TESTING 1
+//#define TESTING 1
 
 /*===========
   * RTOS Internal
@@ -68,6 +68,9 @@ extern void Exit_Kernel(); /* this is the same as CSwitch() */
 
 #ifdef TESTING
 extern void test_main();
+#endif
+#ifndef TESTING
+extern void a_main();
 #endif
 
 
@@ -887,7 +890,7 @@ int main()
 	Task_Create_System(test_main, 0);
 	#endif
 	#ifndef TESTING
-	//Task_Create_System() // application task create
+	Task_Create_System(a_main, 0); // application task create
 	#endif
     setupTimer();
     OS_Start();

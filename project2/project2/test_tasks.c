@@ -1,4 +1,4 @@
-#define TESTING 1 // testing flag; disable if not testing
+// #define TESTING 1 // testing flag; disable if not testing
 #define F_CPU 16000000UL
 
 #ifdef TESTING
