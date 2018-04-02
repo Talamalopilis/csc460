@@ -1,5 +1,8 @@
 #include "os.h"
+#include "LCD/lcd.h"
+
+extern void lcd_task();
 
 void a_main() {
-	for(;;);
+	Task_Create_RR(lcd_task, 0);
 }
