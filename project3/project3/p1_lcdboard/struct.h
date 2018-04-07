@@ -1,4 +1,7 @@
 #include <stdint.h>
+#include "os.h"
+
+#define LASER_PERIOD 10
 
 typedef struct system_state {
 	uint16_t rjs_x;
@@ -7,6 +10,7 @@ typedef struct system_state {
 	uint16_t sjs_x;
 	uint16_t sjs_y;
 	uint8_t sjs_z;
+	TICK laser_time;
 };
 
 typedef union system_data {

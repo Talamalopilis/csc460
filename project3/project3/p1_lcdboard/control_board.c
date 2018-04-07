@@ -5,13 +5,9 @@
 
 extern void lcd_task();
 
-uint8_t analog_reference = DEFAULT;
+static uint8_t analog_reference = DEFAULT;
 
 union system_data sdata;
-
-uint16_t joystick_x = 0;
-uint16_t joystick_y = 0;
-uint8_t joystick_z = 0;
 
 void analogReference(uint8_t mode) {
 	// can't actually set the register here because the default setting
@@ -54,20 +50,35 @@ int analogRead(uint8_t pin) {
 }
 
 void joystick_task() {
-	DDRC &= ~1;
-	PORTC |= 1;
+	DDRC &= ~0x01;
+	PORTC |= 0x01;
 	for(;;) {
 		sdata.state.sjs_x = analogRead(PIN_A8);
 		sdata.state.sjs_y = analogRead(PIN_A9);
 		sdata.state.rjs_x = analogRead(PIN_A10);
 		sdata.state.rjs_y = analogRead(PIN_A11);
-		sdata.state.sjs_z = (PINC & 1) ^ 1;
+		sdata.state.sjs_z = (PINC & 0x01) ^ 0x01;
+		Task_Next();
+	}
+}
+
+void laser_task() {
+	DDRG |= 0x02;
+	for(;;) {
+		if(sdata.state.sjs_z && sdata.state.laser_time > 0) {
+			PORTG |= 0x02;
+			--sdata.state.laser_time;
+		} else {
+			PORTG &= ~0x02;
+		}
 		Task_Next();
 	}
 }
 
 void a_main() {
-	analogReference(1);
+	sdata.state.laser_time = 30000 / (MSECPERTICK * LASER_PERIOD);
+	analogReference(DEFAULT);
 	Task_Create_Period(joystick_task, 0, 5, 10, 0);
 	Task_Create_Period(lcd_task, 0, 50, 100, 10);
+	Task_Create_Period(laser_task, 0, LASER_PERIOD, 10, 1);
 }
