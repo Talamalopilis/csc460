@@ -14,7 +14,7 @@ extern "C" void lcd_task() {
 	lcd.begin(16,2);
 	lcd.setCursor(0,0);
 	for(;;) {
-		snprintf(s, 16, "%4d", joystick_x);
+		snprintf(s, 17, "%4d", joystick_x);
 		lcd.home();
 		lcd.print(s);
 		Task_Next();
