@@ -1,19 +1,22 @@
 #include <LiquidCrystal.h>
-#include "lcd.h"
+
 extern "C" {
 	#include <util/delay.h>	
+	#include <stdio.h>
+	#include "../os.h"
+	extern uint16_t joystick_x;
 };
 
-LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
-
 extern "C" void lcd_task() {
+	LiquidCrystal lcd(8, 9, 4, 5, 6, 7);
 	unsigned long int i;
+	char s [17];
 	lcd.begin(16,2);
 	lcd.setCursor(0,0);
-	for(i = 0;; i++) {
-		lcd.print(i);
+	for(;;) {
+		snprintf(s, 16, "%4d", joystick_x);
 		lcd.home();
-		//_delay_ms(1000);
-		//lcd.clear();
+		lcd.print(s);
+		Task_Next();
 	}
 }
