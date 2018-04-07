@@ -1,4 +1,5 @@
 #include "os.h"
+#include "struct.h"
 #include <pins_arduino.h>
 #include <wiring_private.h>
 
@@ -6,10 +7,13 @@ extern void lcd_task();
 
 uint8_t analog_reference = DEFAULT;
 
-uint16_t joystick_x = 0;
+union system_data sdata;
 
-void analogReference(uint8_t mode)
-{
+uint16_t joystick_x = 0;
+uint16_t joystick_y = 0;
+uint8_t joystick_z = 0;
+
+void analogReference(uint8_t mode) {
 	// can't actually set the register here because the default setting
 	// will connect AVCC and the AREF pin, which would cause a short if
 	// there's something connected to AREF.
@@ -17,8 +21,7 @@ void analogReference(uint8_t mode)
 }
 
 
-int analogRead(uint8_t pin)
-{
+int analogRead(uint8_t pin) {
 	uint8_t low, high;
 	if (pin >= 54) pin -= 54; // allow for channel or pin numbers
 
@@ -50,15 +53,21 @@ int analogRead(uint8_t pin)
 	return (high << 8) | low;
 }
 
-void analog_read_test() {
+void joystick_task() {
+	DDRC &= ~1;
+	PORTC |= 1;
 	for(;;) {
-		joystick_x = analogRead(PIN_A8);
+		sdata.state.sjs_x = analogRead(PIN_A8);
+		sdata.state.sjs_y = analogRead(PIN_A9);
+		sdata.state.rjs_x = analogRead(PIN_A10);
+		sdata.state.rjs_y = analogRead(PIN_A11);
+		sdata.state.sjs_z = (PINC & 1) ^ 1;
 		Task_Next();
 	}
 }
 
 void a_main() {
 	analogReference(1);
-	Task_Create_Period(analog_read_test, 0, 15, 10, 0);
+	Task_Create_Period(joystick_task, 0, 5, 10, 0);
 	Task_Create_Period(lcd_task, 0, 50, 100, 10);
 }
