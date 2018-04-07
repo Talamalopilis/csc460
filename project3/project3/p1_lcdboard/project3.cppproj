@@ -275,7 +275,7 @@
     <Compile Include="LCD\lcd.cpp">
       <SubType>compile</SubType>
     </Compile>
-    <Compile Include="main.c">
+    <Compile Include="control_board.c">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="os.c">
