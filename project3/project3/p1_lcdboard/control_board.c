@@ -7,6 +7,10 @@ extern void lcd_task();
 
 static uint8_t analog_reference = DEFAULT;
 
+static char cruise_out;
+static char escape_out;
+static char user_out;
+
 union system_data sdata;
 
 void analogReference(uint8_t mode) {
@@ -75,10 +79,71 @@ void laser_task() {
 	}
 }
 
+void escape_task() {
+	for(;;) {
+		escape_out = NULL;
+		Task_Next();
+	}
+}
+
+void cruise_task() {
+	for(;;) {
+		cruise_out = 'f';
+		Task_Next();
+	}
+}
+
+
+
+void user_ai_task() {
+	for(;;) {
+		if(sdata.state.rjs_x > 600 || sdata.state.rjs_x < 400 || sdata.state.rjs_y > 600 || sdata.state.rjs_y < 400) {
+			user_out = 'f';
+			} else {
+			user_out = NULL;
+		}
+		Task_Next();
+	}	
+}
+
+void choose_ai_routine() {
+	for(;;) {
+		if(escape_out != NULL) {
+			sdata.state.action_source = ESCAPE;
+			sdata.state.current_action = escape_out;
+		} else if (user_out != NULL) {
+			sdata.state.action_source = USER;
+			sdata.state.current_action = user_out;
+		} else {
+			sdata.state.action_source = CRUISE;
+			sdata.state.current_action = cruise_out;
+		}
+		Task_Next();
+	}
+}
+
+void send_bt() {
+	for (;;) {
+		Task_Next();
+	}
+}
+
+void receive_bt() {
+	for (;;) {
+		Task_Next();
+	}
+}
+
 void a_main() {
 	sdata.state.laser_time = 30000 / (MSECPERTICK * LASER_PERIOD);
 	analogReference(DEFAULT);
 	Task_Create_Period(joystick_task, 0, 5, 10, 0);
 	Task_Create_Period(lcd_task, 0, 50, 100, 10);
 	Task_Create_Period(laser_task, 0, LASER_PERIOD, 10, 1);
+	Task_Create_Period(escape_task, 0, 10, 1, 2);
+	Task_Create_Period(user_ai_task, 0, 10, 1, 3);
+	Task_Create_Period(cruise_task, 0, 10, 1, 4);
+	Task_Create_Period(choose_ai_routine, 0, 10, 1, 5);
+	Task_Create_Period(send_bt, 0, 30, 1, 6);
+	Task_Create_Period(receive_bt, 0, 25, 1, 7);
 }

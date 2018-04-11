@@ -39,7 +39,8 @@
 
 #define WORKSPACE 256
 #define MAXPROCESS 4
-#define MAXTHREADS MAXPROCESS * 3 + 1
+#define MAXPERIODICPROCESS 10
+#define MAXTHREADS MAXPROCESS * 2 + MAXPERIODICPROCESS + 1
 
 // testing flag, comment out if not testing
 //#define TESTING 1
@@ -166,7 +167,7 @@ typedef struct ProcessDescriptor
   */
 static PD round_robin_tasks[MAXPROCESS];
 static PD system_tasks[MAXPROCESS];
-static PD periodic_tasks[MAXPROCESS];
+static PD periodic_tasks[MAXPERIODICPROCESS];
 static PD idle_task;
 static PD *pid_to_pd[MAXPROCESS * 3 + 10] = {NULL};
 
@@ -275,24 +276,30 @@ static void Kernel_Create_Task(voidfuncptr f, unsigned int priority, uint16_t pi
 {
     int x;
     PD *queue;
+	int maxlength;
 
     switch (priority)
     {
 	case IDLE:
 		idle_task.priority = IDLE;
 		Kernel_Create_Task_At(&idle_task, f, pid);
+		maxlength = MAXPROCESS;
 		return;
     case ROUND_ROBIN:
         queue = round_robin_tasks;
+		maxlength = MAXPERIODICPROCESS;
         break;
     case PERIODIC:
         queue = periodic_tasks;
+		maxlength = MAXPROCESS;
         break;
     case SYSTEM:
         queue = system_tasks;
+		maxlength = MAXPROCESS;
         break;
     default:
         queue = round_robin_tasks;
+		maxlength = MAXPROCESS;
         break;
     }
 
@@ -301,7 +308,7 @@ static void Kernel_Create_Task(voidfuncptr f, unsigned int priority, uint16_t pi
 	}
 
     /* find a DEAD PD that we can use  */
-    for (x = 0; x < MAXPROCESS; x++)
+    for (x = 0; x < maxlength; x++)
     {
         if (queue[x].state == DEAD)
             break;
@@ -359,7 +366,7 @@ static void Dispatch()
         NextP_Sys = (NextP_Sys + 1) % MAXPROCESS;
     }
 
-    for (i = 0; i < MAXPROCESS; ++i)
+    for (i = 0; i < MAXPERIODICPROCESS; ++i)
     {
         if (periodic_tasks[NextP_Per].state == READY)
         {
@@ -386,7 +393,7 @@ static void Dispatch()
 				return;
 			}
 		}
-        NextP_Per = (NextP_Per + 1) % MAXPROCESS;
+        NextP_Per = (NextP_Per + 1) % MAXPERIODICPROCESS;
     }
 
     for (i = 0; i < MAXPROCESS; ++i)
@@ -525,11 +532,13 @@ void OS_Init()
     {
         memset(&(round_robin_tasks[x]), 0, sizeof(PD));
         round_robin_tasks[x].state = DEAD;
-		memset(&(system_tasks[x]), 0, sizeof(PD));
-		system_tasks[x].state = DEAD;
 		memset(&(periodic_tasks[x]), 0, sizeof(PD));
 		periodic_tasks[x].state = DEAD;
     }
+	for(x = 0; x < MAXPERIODICPROCESS; x++) {
+		memset(&(system_tasks[x]), 0, sizeof(PD));
+		system_tasks[x].state = DEAD;
+	}
 }
 
 /**
@@ -607,7 +616,7 @@ PID Task_Create_RR(voidfuncptr f, int arg)
 PID Task_Create_Period(voidfuncptr f, int arg, TICK period, TICK wcet, TICK offset)
 {
 	int x;
-	for (x = 0; x < MAXPROCESS; x++)
+	for (x = 0; x < MAXPERIODICPROCESS; x++)
 	{
 		if (periodic_tasks[x].state == DEAD)
 		break;

@@ -2,6 +2,9 @@
 #include "os.h"
 
 #define LASER_PERIOD 10
+#define ESCAPE 'e'
+#define USER 'u'
+#define CRUISE 'c'
 
 typedef struct system_state {
 	uint16_t rjs_x;
@@ -10,6 +13,8 @@ typedef struct system_state {
 	uint16_t sjs_x;
 	uint16_t sjs_y;
 	uint8_t sjs_z;
+	char current_action;
+	char action_source;
 	TICK laser_time;
 };
 
