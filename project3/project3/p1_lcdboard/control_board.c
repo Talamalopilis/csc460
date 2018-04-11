@@ -2,6 +2,7 @@
 #include "struct.h"
 #include <pins_arduino.h>
 #include <wiring_private.h>
+#include "UART/usart.h"
 
 extern void lcd_task();
 
@@ -99,7 +100,7 @@ void user_ai_task() {
 	for(;;) {
 		if(sdata.state.rjs_x > 600 || sdata.state.rjs_x < 400 || sdata.state.rjs_y > 600 || sdata.state.rjs_y < 400) {
 			user_out = 'f';
-			} else {
+		} else {
 			user_out = NULL;
 		}
 		Task_Next();
@@ -123,13 +124,13 @@ void choose_ai_routine() {
 }
 
 void send_bt() {
+	int i;
+	uart1_init(BAUD_CALC(115200));
 	for (;;) {
-		Task_Next();
-	}
-}
-
-void receive_bt() {
-	for (;;) {
+		uart1_putc('$');
+		for(i = 0; i < sizeof(struct system_state); i++) {
+			uart1_putc(sdata.data[i]);
+		}
 		Task_Next();
 	}
 }
@@ -145,5 +146,4 @@ void a_main() {
 	Task_Create_Period(cruise_task, 0, 10, 1, 4);
 	Task_Create_Period(choose_ai_routine, 0, 10, 1, 5);
 	Task_Create_Period(send_bt, 0, 30, 1, 6);
-	Task_Create_Period(receive_bt, 0, 25, 1, 7);
 }
