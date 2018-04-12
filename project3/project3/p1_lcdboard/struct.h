@@ -13,8 +13,6 @@ typedef struct system_state {
 	uint16_t sjs_x;
 	uint16_t sjs_y;
 	uint8_t sjs_z;
-	char current_action;
-	char action_source;
 	TICK laser_time;
 };
 

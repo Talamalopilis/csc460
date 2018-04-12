@@ -38,6 +38,9 @@ int ppos = 1500;
 
 union system_data sdata;
 
+char current_action;
+char action_source;
+
 void analogReference(uint8_t mode) {
 	// can't actually set the register here because the default setting
 	// will connect AVCC and the AREF pin, which would cause a short if
@@ -171,14 +174,14 @@ void user_ai_task() {
 void choose_ai_routine() {
 	for(;;) {
 		if(escape_out != NULL) {
-			sdata.state.action_source = ESCAPE;
-			sdata.state.current_action = escape_out;
+			action_source = ESCAPE;
+			current_action = escape_out;
 			} else if (user_out != NULL) {
-			sdata.state.action_source = USER;
-			sdata.state.current_action = user_out;
+			action_source = USER;
+			current_action = user_out;
 			} else {
-			sdata.state.action_source = CRUISE;
-			sdata.state.current_action = cruise_out;
+			action_source = CRUISE;
+			current_action = cruise_out;
 		}
 		Task_Next();
 	}
