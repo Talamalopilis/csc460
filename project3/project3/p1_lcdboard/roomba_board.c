@@ -1,3 +1,4 @@
+#ifndef CONTROL
 #include "os.h"
 #include "struct.h"
 #include <pins_arduino.h>
@@ -32,6 +33,8 @@ static uint8_t analog_reference = DEFAULT;
 static char cruise_out;
 static char escape_out;
 static char user_out;
+
+static struct roomba_state rs;
 
 int tpos = 1500;
 int ppos = 1500;
@@ -146,7 +149,17 @@ void laser_task() {
 
 void escape_task() {
 	for(;;) {
-		escape_out = NULL;
+		if(rs.bumper_pressed || rs.vwall_detected) {
+			int i;
+			for(i = 0; i < 10; ++i) {
+				// reverse
+				// Task_Next();
+			}
+			escape_out = NULL;
+		} else {
+			escape_out = NULL;
+		}
+		
 		Task_Next();
 	}
 }
@@ -182,18 +195,6 @@ void choose_ai_routine() {
 			} else {
 			action_source = CRUISE;
 			current_action = cruise_out;
-		}
-		Task_Next();
-	}
-}
-
-void send_bt() {
-	int i;
-	uart1_init(BAUD_CALC(115200));
-	for (;;) {
-		uart1_putc('$');
-		for(i = 0; i < sizeof(struct system_state); i++) {
-			uart1_putc(sdata.data[i]);
 		}
 		Task_Next();
 	}
@@ -243,15 +244,13 @@ void roomba_task() {
 void a_main() {
 	sdata.state.laser_time = 30000 / (MSECPERTICK * LASER_PERIOD);
 	analogReference(DEFAULT);
-	Task_Create_Period(joystick_task, 0, 5, 10, 0);
-	Task_Create_Period(lcd_task, 0, 50, 100, 10);
 	Task_Create_Period(laser_task, 0, LASER_PERIOD, 10, 1);
-	Task_Create_Period(escape_task, 0, 10, 1, 2);
-	Task_Create_Period(user_ai_task, 0, 10, 1, 3);
-	Task_Create_Period(cruise_task, 0, 10, 1, 4);
-	Task_Create_Period(choose_ai_routine, 0, 10, 1, 5);
-	Task_Create_Period(send_bt, 0, 30, 1, 6);
+	Task_Create_Period(escape_task, 0, 5, 1, 2);
+	Task_Create_Period(user_ai_task, 0, 5, 1, 3);
+	Task_Create_Period(cruise_task, 0, 5, 1, 4);
+	Task_Create_Period(choose_ai_routine, 0, 5, 1, 5);
 	Task_Create_Period(roomba_task, 0, 20, 1000, 0);
 }
 
 
+#endif

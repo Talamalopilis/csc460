@@ -16,6 +16,11 @@ typedef struct system_state {
 	TICK laser_time;
 };
 
+typedef struct roomba_state {
+	uint8_t bumper_pressed;
+	uint8_t vwall_detected;
+};
+
 typedef union system_data {
 	struct system_state state;
 	char data[sizeof(struct system_state)];
