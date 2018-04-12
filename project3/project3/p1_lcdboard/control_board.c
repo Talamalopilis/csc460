@@ -4,6 +4,27 @@
 #include <wiring_private.h>
 #include "UART/usart.h"
 
+#define HIGH_BYTE(x) (x>>8)
+#define LOW_BYTE(x)  (x&0xFF)
+
+#define START 128   // start the Roomba's serial command interface
+#define BAUD  129   // set the SCI's baudrate (default on full power cycle is 57600
+#define CONTROL 130   // enable control via SCI
+#define SAFE  131   // enter safe mode
+#define FULL  132   // enter full mode
+#define POWER 133   // put the Roomba to sleep
+#define SPOT  134   // start spot cleaning cycle
+#define CLEAN 135   // start normal cleaning cycle
+#define MAX   136   // start maximum time cleaning cycle
+#define DRIVE 137   // control wheels
+#define MOTORS  138   // turn cleaning motors on or off
+#define LEDS  139   // activate LEDs
+#define SONG  140   // load a song into memory
+#define PLAY  141   // play a song that was loaded using SONG
+#define SENSORS 142   // retrieve one of the sensor packets
+#define DOCK  143   // force the Roomba to seek its dock.
+#define STOP 173
+
 extern void lcd_task();
 
 static uint8_t analog_reference = DEFAULT;
@@ -11,6 +32,9 @@ static uint8_t analog_reference = DEFAULT;
 static char cruise_out;
 static char escape_out;
 static char user_out;
+
+int tpos = 1500;
+int ppos = 1500;
 
 union system_data sdata;
 
@@ -65,6 +89,43 @@ void joystick_task() {
 		sdata.state.sjs_z = (PINC & 0x01) ^ 0x01;
 		Task_Next();
 	}
+}
+
+void servo_task(){
+    TCCR1A|=(1<<COM1A1)|(1<<COM1B1)|(1<<WGM11);
+    TCCR1B|=(1<<WGM13)|(1<<WGM12)|(1<<CS11)|(1<<CS10);
+
+    ICR1=4999;
+
+    DDRB|=(1<<PB5)|(1<<PB6); // pin 11, 12
+    while(1)
+    {
+         ppos += ((int)sdata.state.sjs_x - 509) / 50;
+         tpos += ((int)sdata.state.sjs_y - 510) / 50;
+
+         if (ppos > 2000)
+         {
+			 ppos = 2000;
+         }
+          else if (ppos < 1000)
+          {
+			 ppos = 1000;
+          }
+          if (tpos > 2000)
+          {
+             tpos = 2000;
+          }
+          else if (tpos < 1000)
+          {
+             tpos = 1000;
+          }
+
+          //sdata.state.tpos = tpos;
+          //sdata.state.ppos = ppos;
+          OCR1A=(3000 - ppos)/4;
+          OCR1B=(tpos)/4;
+          Task_Next();
+       }
 }
 
 void laser_task() {
@@ -135,6 +196,47 @@ void send_bt() {
 	}
 }
 
+void roomba_task() {
+	uart0_init(BAUD_CALC(19200));
+	uart2_init(BAUD_CALC(19200));
+	uart2_putc(START);
+	uart2_putc(SAFE);
+	uart2_putc(LEDS);
+	uart2_putc(4);
+	uart2_putc(0);
+	uart2_putc(0);
+	for(;;){
+		//if (uart0_AvailableBytes()){
+			////uart2_putc(uart0_getc());
+			//}
+		
+		uart2_putc(SENSORS);
+		uart2_putc(7);
+		char packet = 0;
+		Task_Next();
+		if (uart2_AvailableBytes()){
+			packet = uart2_getc();
+			uart0_putint(packet);
+			uart0_putc_('\n');
+		
+			if (packet == 1){
+				uart2_putc(LEDS);
+				uart2_putc(4);
+				uart2_putc(0);
+				uart2_putc(0);
+			}
+			if (packet == 2){
+				uart2_putc(LEDS);
+				uart2_putc(4);
+				uart2_putc(0);
+				uart2_putc(128);
+			}
+		}
+		Task_Next();
+	}
+	
+}
+
 void a_main() {
 	sdata.state.laser_time = 30000 / (MSECPERTICK * LASER_PERIOD);
 	analogReference(DEFAULT);
@@ -146,4 +248,7 @@ void a_main() {
 	Task_Create_Period(cruise_task, 0, 10, 1, 4);
 	Task_Create_Period(choose_ai_routine, 0, 10, 1, 5);
 	Task_Create_Period(send_bt, 0, 30, 1, 6);
+	Task_Create_Period(roomba_task, 0, 20, 1000, 0);
 }
+
+
