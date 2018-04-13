@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "os.h"
 
+#define CONTROL 1
 #define LASER_PERIOD 10
 #define ESCAPE 'e'
 #define USER 'u'

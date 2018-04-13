@@ -1,6 +1,6 @@
+#include "struct.h"
 #ifdef CONTROL
 #include "os.h"
-#include "struct.h"
 #include <pins_arduino.h>
 #include <wiring_private.h>
 #include "UART/usart.h"
@@ -83,7 +83,7 @@ void send_bt() {
 void a_main() {
 	analogReference(DEFAULT);
 	Task_Create_Period(joystick_task, 0, 5, 10, 0);
-	Task_Create_Period(lcd_task, 0, 50, 100, 10);
+	Task_Create_Period(lcd_task, 0, 25, 100, 10);
 	Task_Create_Period(send_bt, 0, 5, 1, 6);
 }
 

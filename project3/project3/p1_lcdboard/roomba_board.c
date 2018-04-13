@@ -1,6 +1,6 @@
+#include "struct.h"
 #ifndef CONTROL
 #include "os.h"
-#include "struct.h"
 #include <pins_arduino.h>
 #include <wiring_private.h>
 #include "UART/usart.h"

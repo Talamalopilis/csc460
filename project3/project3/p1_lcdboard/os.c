@@ -888,7 +888,6 @@ void Task_Init()
   * This function creates two cooperative tasks, "Ping" and "Pong". Both
   * will run forever.
   */
-#define CONTROL
 
 int main()
 {
