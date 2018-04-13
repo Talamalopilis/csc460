@@ -35,6 +35,9 @@ static char escape_out;
 static char user_out;
 
 static struct roomba_state rs;
+static uint16_t light_sensor;
+
+static uint8_t roomba_alive = 1;
 
 int tpos = 1500;
 int ppos = 1500;
@@ -84,16 +87,10 @@ int analogRead(uint8_t pin) {
 	return (high << 8) | low;
 }
 
-void joystick_task() {
-	DDRC &= ~0x01;
-	PORTC |= 0x01;
-	for(;;) {
-		sdata.state.sjs_x = analogRead(PIN_A8);
-		sdata.state.sjs_y = analogRead(PIN_A9);
-		sdata.state.rjs_x = analogRead(PIN_A10);
-		sdata.state.rjs_y = analogRead(PIN_A11);
-		sdata.state.sjs_z = (PINC & 0x01) ^ 0x01;
-		Task_Next();
+void light_sensor_read() {
+	light_sensor = analogRead(PIN_A1);
+	if(light_sensor > 800) {
+		roomba_alive = 0;
 	}
 }
 
@@ -179,9 +176,15 @@ void cruise_task() {
 
 void user_ai_task() {
 	for(;;) {
-		if(sdata.state.rjs_x > 600 || sdata.state.rjs_x < 400 || sdata.state.rjs_y > 600 || sdata.state.rjs_y < 400) {
+		if(sdata.state.rjs_y < 200) {
 			user_out = 'f';
-			} else {
+		} else if (sdata.state.rjs_y > 800) {
+			user_out = 'b';
+		} else if (sdata.state.rjs_x > 800) {
+			user_out = 'r';
+		} else if (sdata.state.rjs_y < 200) {
+			user_out = 'l';
+		} else {
 			user_out = NULL;
 		}
 		Task_Next();
