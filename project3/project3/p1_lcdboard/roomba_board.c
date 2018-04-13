@@ -152,8 +152,12 @@ void escape_task() {
 		if(rs.bumper_pressed || rs.vwall_detected) {
 			int i;
 			for(i = 0; i < 10; ++i) {
-				// reverse
-				// Task_Next();
+				escape_out = 'b'; // reverse
+				Task_Next();
+			}
+			for(i = 0; i < 10; ++i) {
+				escape_out = 'r';
+				Task_Next(); // turn right
 			}
 			escape_out = NULL;
 		} else {
@@ -189,10 +193,10 @@ void choose_ai_routine() {
 		if(escape_out != NULL) {
 			action_source = ESCAPE;
 			current_action = escape_out;
-			} else if (user_out != NULL) {
+		} else if (user_out != NULL) {
 			action_source = USER;
 			current_action = user_out;
-			} else {
+		} else {
 			action_source = CRUISE;
 			current_action = cruise_out;
 		}
@@ -218,7 +222,8 @@ void roomba_task() {
 		uart2_putc(7);
 		char packet = 0;
 		Task_Next();
-		if (uart2_AvailableBytes()){
+		if (uart2_AvailableBytes()) {
+			// populate roomba state (rs) here
 			packet = uart2_getc();
 			uart0_putint(packet);
 			uart0_putc_('\n');
