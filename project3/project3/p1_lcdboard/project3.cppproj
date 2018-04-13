@@ -266,6 +266,9 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="roomba_board.c">
+      <SubType>compile</SubType>
+    </Compile>
     <Compile Include="struct.h">
       <SubType>compile</SubType>
     </Compile>

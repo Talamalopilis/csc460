@@ -888,6 +888,7 @@ void Task_Init()
   * This function creates two cooperative tasks, "Ping" and "Pong". Both
   * will run forever.
   */
+
 int main()
 {
     OS_Init();
@@ -899,6 +900,7 @@ int main()
 	Task_Create_System(test_main, 0);
 	#endif
 	#ifndef TESTING
+	
 	Task_Create_System(a_main, 0); // application task create
 	#endif
     setupTimer();

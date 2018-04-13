@@ -16,7 +16,7 @@ extern "C" void lcd_task() {
 	lcd.begin(16,2);
 	lcd.setCursor(0,0);
 	for(;;) {
-		snprintf(line1, 17, "%4d %4d %1d %c %c", sdata.state.sjs_x, sdata.state.sjs_y, sdata.state.sjs_z, sdata.state.action_source, sdata.state.current_action);
+		snprintf(line1, 17, "%4d %4d %1d", sdata.state.sjs_x, sdata.state.sjs_y, sdata.state.sjs_z);
 		snprintf(line2, 17, "%4d %4d %5d", sdata.state.rjs_x, sdata.state.rjs_y, sdata.state.laser_time);
 		lcd.home();
 		lcd.print(line1);

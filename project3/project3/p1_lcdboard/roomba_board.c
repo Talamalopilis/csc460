@@ -1,5 +1,6 @@
-#include "os.h"
 #include "struct.h"
+#ifndef CONTROL
+#include "os.h"
 #include <pins_arduino.h>
 #include <wiring_private.h>
 #include "UART/usart.h"
@@ -32,6 +33,12 @@ static uint8_t analog_reference = DEFAULT;
 static char cruise_out;
 static char escape_out;
 static char user_out;
+
+static struct roomba_state rs;
+static uint16_t light_sensor;
+
+static uint8_t roomba_alive = 1;
+static uint8_t move_switch = 1;
 
 int tpos = 1500;
 int ppos = 1500;
@@ -81,16 +88,10 @@ int analogRead(uint8_t pin) {
 	return (high << 8) | low;
 }
 
-void joystick_task() {
-	DDRC &= ~0x01;
-	PORTC |= 0x01;
-	for(;;) {
-		sdata.state.sjs_x = analogRead(PIN_A8);
-		sdata.state.sjs_y = analogRead(PIN_A9);
-		sdata.state.rjs_x = analogRead(PIN_A10);
-		sdata.state.rjs_y = analogRead(PIN_A11);
-		sdata.state.sjs_z = (PINC & 0x01) ^ 0x01;
-		Task_Next();
+void light_sensor_read() {
+	light_sensor = analogRead(PIN_A1);
+	if(light_sensor > 800) {
+		roomba_alive = 0;
 	}
 }
 
@@ -146,7 +147,21 @@ void laser_task() {
 
 void escape_task() {
 	for(;;) {
-		escape_out = NULL;
+		if(rs.bumper_pressed || rs.vwall_detected) {
+			int i;
+			for(i = 0; i < 10; ++i) {
+				escape_out = 'b'; // reverse
+				Task_Next();
+			}
+			for(i = 0; i < 10; ++i) {
+				escape_out = 'r';
+				Task_Next(); // turn right
+			}
+			escape_out = NULL;
+		} else {
+			escape_out = NULL;
+		}
+		
 		Task_Next();
 	}
 }
@@ -162,10 +177,21 @@ void cruise_task() {
 
 void user_ai_task() {
 	for(;;) {
-		if(sdata.state.rjs_x > 600 || sdata.state.rjs_x < 400 || sdata.state.rjs_y > 600 || sdata.state.rjs_y < 400) {
+		if(sdata.state.rjs_y < 200) {
 			user_out = 'f';
-			} else {
+		} else if (sdata.state.rjs_y > 800) {
+			user_out = 'b';
+		} else if (sdata.state.rjs_x > 800) {
+			user_out = 'r';
+		} else if (sdata.state.rjs_y < 200) {
+			user_out = 'l';
+		} else {
+			if (sdata.state.rjs_z){
+				user_out = 's';
+			}
+			else{
 			user_out = NULL;
+			}
 		}
 		Task_Next();
 	}
@@ -176,10 +202,10 @@ void choose_ai_routine() {
 		if(escape_out != NULL) {
 			action_source = ESCAPE;
 			current_action = escape_out;
-			} else if (user_out != NULL) {
+		} else if (user_out != NULL) {
 			action_source = USER;
 			current_action = user_out;
-			} else {
+		} else {
 			action_source = CRUISE;
 			current_action = cruise_out;
 		}
@@ -187,38 +213,37 @@ void choose_ai_routine() {
 	}
 }
 
-void send_bt() {
-	int i;
+void receive_bt() {
 	uart1_init(BAUD_CALC(19200));
-	for (;;) {
-		uart1_putc('$');
-		for(i = 0; i < sizeof(struct system_state); i++) {
-			uart1_putc(sdata.data[i]);
+	for(;;){
+		if (uart1_AvailableBytes() > sizeof(struct system_state)){
+			while (uart1_peek() != '$') {
+				if (uart1_AvailableBytes()) {
+					uart1_getc();
+				}
+				else {
+					Task_Next();
+				}
+			}
+			if (uart1_AvailableBytes() > sizeof(struct system_state)) {
+				uart1_getc();
+				uart1_gets(sdata.data, sizeof(struct system_state));
+			
+			}
 		}
 		Task_Next();
 	}
 }
 
-void receive_bt() {
-	uart1_init(BAUD_CALC(19200));
-	if (uart1_AvailableBytes() > sizeof(struct system_state)){
-		while (uart1_peek() != '$') {
-			if (uart1_AvailableBytes()) {
-				uart1_getc();
-			}
-			else {
-				Task_Next();
-			}
-		}
-		if (uart1_AvailableBytes() > sizeof(struct system_state)) {
-			uart1_getc();
-			uart1_gets(sdata.data, sizeof(struct system_state));
-		}
+void move_switch_task(){
+	for (;;){
+	move_switch ^= 1;
+	Task_Next();
 	}
 }
 
 void roomba_task() {
-	uart0_init(BAUD_CALC(19200));
+	//uart0_init(BAUD_CALC(19200));
 	uart2_init(BAUD_CALC(19200));
 	uart2_putc(START);
 	uart2_putc(SAFE);
@@ -227,31 +252,60 @@ void roomba_task() {
 	uart2_putc(0);
 	uart2_putc(0);
 	for(;;){
-		//if (uart0_AvailableBytes()){
-		////uart2_putc(uart0_getc());
-		//}
 		
-		uart2_putc(SENSORS);
+		switch(current_action) {
+			case 'l':
+				uart2_putc(DRIVE);
+				uart2_putc(HIGH_BYTE(50));
+				uart2_putc(LOW_BYTE(50));
+				uart2_putc(HIGH_BYTE(1));
+				uart2_putc(LOW_BYTE(1));
+				break;
+			case 'r':
+				uart2_putc(DRIVE);
+				uart2_putc(HIGH_BYTE(50));
+				uart2_putc(LOW_BYTE(50));
+				uart2_putc(HIGH_BYTE(-1));
+				uart2_putc(LOW_BYTE(-1));
+				break;
+			case 'b':
+				if (move_switch){
+				uart2_putc(DRIVE);
+				uart2_putc(HIGH_BYTE(-50));
+				uart2_putc(LOW_BYTE(-50));
+				uart2_putc(HIGH_BYTE(32768));
+				uart2_putc(LOW_BYTE(32768));
+				}
+				break;
+			case 'f':
+				if (move_switch){
+				uart2_putc(DRIVE);
+				uart2_putc(HIGH_BYTE(50));
+				uart2_putc(LOW_BYTE(50));
+				uart2_putc(HIGH_BYTE(32768));
+				uart2_putc(LOW_BYTE(32768));
+				}
+				break;
+			default:
+				uart2_putc(DRIVE);
+				uart2_putc(HIGH_BYTE(0));
+				uart2_putc(LOW_BYTE(0));
+				uart2_putc(HIGH_BYTE(0));
+				uart2_putc(LOW_BYTE(0));
+				break;
+		}
+		
+		uart2_putc(149);
+		uart2_putc(2);
 		uart2_putc(7);
-		char packet = 0;
+		uart2_putc(13);
+		char packet1 = 0;
+		char packet2 = 0;
 		Task_Next();
-		if (uart2_AvailableBytes()){
-			packet = uart2_getc();
-			uart0_putint(packet);
-			uart0_putc_('\n');
-			
-			if (packet == 1){
-				uart2_putc(LEDS);
-				uart2_putc(4);
-				uart2_putc(0);
-				uart2_putc(0);
-			}
-			if (packet == 2){
-				uart2_putc(LEDS);
-				uart2_putc(4);
-				uart2_putc(0);
-				uart2_putc(128);
-			}
+		if (uart2_AvailableBytes()) {
+			// populate roomba state (rs) here
+			rs.bumper_pressed = uart2_getc();
+			rs.vwall_detected = uart2_getc();	
 		}
 		Task_Next();
 	}
@@ -261,15 +315,15 @@ void roomba_task() {
 void a_main() {
 	sdata.state.laser_time = 30000 / (MSECPERTICK * LASER_PERIOD);
 	analogReference(DEFAULT);
-	Task_Create_Period(joystick_task, 0, 5, 10, 0);
-	Task_Create_Period(lcd_task, 0, 50, 100, 10);
 	Task_Create_Period(laser_task, 0, LASER_PERIOD, 10, 1);
-	Task_Create_Period(escape_task, 0, 10, 1, 2);
-	Task_Create_Period(user_ai_task, 0, 10, 1, 3);
-	Task_Create_Period(cruise_task, 0, 10, 1, 4);
-	Task_Create_Period(choose_ai_routine, 0, 10, 1, 5);
-	Task_Create_Period(send_bt, 0, 30, 1, 6);
+	Task_Create_Period(escape_task, 0, 5, 1, 2);
+	Task_Create_Period(user_ai_task, 0, 5, 1, 3);
+	Task_Create_Period(cruise_task, 0, 5, 1, 4);
+	Task_Create_Period(choose_ai_routine, 0, 5, 1, 5);
+	Task_Create_Period(receive_bt, 0, 3, 1, 0);
 	Task_Create_Period(roomba_task, 0, 20, 1000, 0);
+	Task_Create_Period(move_switch_task, 0, 6000, 10000, 6000);
 }
 
 
+#endif
