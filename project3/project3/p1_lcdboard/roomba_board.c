@@ -39,6 +39,7 @@ static uint16_t light_sensor;
 
 static uint8_t roomba_alive = 1;
 static uint8_t move_switch = 1;
+static TICK laser_time; 
 
 int tpos = 1500;
 int ppos = 1500;
@@ -87,13 +88,30 @@ int analogRead(uint8_t pin) {
 	// combine the two bytes
 	return (high << 8) | low;
 }
-
+void dead_task(){
+	PORTG &= ~0x02;
+		uart2_putc(DRIVE);
+		uart2_putc(HIGH_BYTE(0));
+		uart2_putc(LOW_BYTE(0));
+		uart2_putc(HIGH_BYTE(0));
+		uart2_putc(LOW_BYTE(0));
+	for(;;);
+}
 void light_sensor_read() {
+	
+	//uart0_init(BAUD_CALC(9600));
+	for (;;){
 	light_sensor = analogRead(PIN_A1);
-	if(light_sensor > 800) {
-		roomba_alive = 0;
+	//uart0_putint(light_sensor);
+	//uart0_putc('\n');
+	if(light_sensor > 950) {
+		Task_Create_System(dead_task, 0);
+	}
+	Task_Next();
 	}
 }
+
+
 
 void servo_task(){
 	TCCR1A|=(1<<COM1A1)|(1<<COM1B1)|(1<<WGM11);
@@ -135,9 +153,9 @@ void servo_task(){
 void laser_task() {
 	DDRG |= 0x02;
 	for(;;) {
-		if(sdata.state.sjs_z && sdata.state.laser_time > 0) {
+		if(sdata.state.sjs_z && laser_time > 0) {
 			PORTG |= 0x02;
-			--sdata.state.laser_time;
+			--laser_time;
 			} else {
 			PORTG &= ~0x02;
 		}
@@ -149,11 +167,11 @@ void escape_task() {
 	for(;;) {
 		if(rs.bumper_pressed || rs.vwall_detected) {
 			int i;
-			for(i = 0; i < 10; ++i) {
+			for(i = 0; i < 75; ++i) {
 				escape_out = 'b'; // reverse
 				Task_Next();
 			}
-			for(i = 0; i < 10; ++i) {
+			for(i = 0; i < 75; ++i) {
 				escape_out = 'r';
 				Task_Next(); // turn right
 			}
@@ -183,7 +201,7 @@ void user_ai_task() {
 			user_out = 'b';
 		} else if (sdata.state.rjs_x > 800) {
 			user_out = 'r';
-		} else if (sdata.state.rjs_y < 200) {
+		} else if (sdata.state.rjs_x < 200) {
 			user_out = 'l';
 		} else {
 			if (sdata.state.rjs_z){
@@ -214,7 +232,8 @@ void choose_ai_routine() {
 }
 
 void receive_bt() {
-	uart1_init(BAUD_CALC(19200));
+	uart0_init(BAUD_CALC(9600));
+	uart1_init(BAUD_CALC(9600));
 	for(;;){
 		if (uart1_AvailableBytes() > sizeof(struct system_state)){
 			while (uart1_peek() != '$') {
@@ -227,8 +246,23 @@ void receive_bt() {
 			}
 			if (uart1_AvailableBytes() > sizeof(struct system_state)) {
 				uart1_getc();
-				uart1_gets(sdata.data, sizeof(struct system_state));
-			
+				for (int i = 0; i < sizeof(struct system_state); i++){
+					sdata.data[i] = uart1_getc();
+				}
+				//uart0_putc('\n');
+				//uart0_putint(sdata.state.rjs_x);
+				//uart0_putc('\n');
+				//uart0_putint(sdata.state.rjs_y);
+				//uart0_putc('\n');
+				//uart0_putint(sdata.state.rjs_z);
+				//uart0_putc('\n');
+				//
+				//uart0_putint(sdata.state.sjs_x);
+				//uart0_putc('\n');
+				//uart0_putint(sdata.state.sjs_y);
+				//uart0_putc('\n');
+				//uart0_putint(sdata.state.sjs_z);
+				//uart0_putc('\n');
 			}
 		}
 		Task_Next();
@@ -276,6 +310,13 @@ void roomba_task() {
 				uart2_putc(HIGH_BYTE(32768));
 				uart2_putc(LOW_BYTE(32768));
 				}
+				else{
+					uart2_putc(DRIVE);
+					uart2_putc(HIGH_BYTE(0));
+					uart2_putc(LOW_BYTE(0));
+					uart2_putc(HIGH_BYTE(0));
+					uart2_putc(LOW_BYTE(0));
+				}
 				break;
 			case 'f':
 				if (move_switch){
@@ -284,6 +325,13 @@ void roomba_task() {
 				uart2_putc(LOW_BYTE(50));
 				uart2_putc(HIGH_BYTE(32768));
 				uart2_putc(LOW_BYTE(32768));
+				}
+				else {
+					uart2_putc(DRIVE);
+					uart2_putc(HIGH_BYTE(0));
+					uart2_putc(LOW_BYTE(0));
+					uart2_putc(HIGH_BYTE(0));
+					uart2_putc(LOW_BYTE(0));
 				}
 				break;
 			default:
@@ -313,16 +361,18 @@ void roomba_task() {
 }
 
 void a_main() {
-	sdata.state.laser_time = 30000 / (MSECPERTICK * LASER_PERIOD);
+	laser_time = 30000 / (MSECPERTICK * LASER_PERIOD);
 	analogReference(DEFAULT);
 	Task_Create_Period(laser_task, 0, LASER_PERIOD, 10, 1);
-	Task_Create_Period(escape_task, 0, 5, 1, 2);
-	Task_Create_Period(user_ai_task, 0, 5, 1, 3);
-	Task_Create_Period(cruise_task, 0, 5, 1, 4);
-	Task_Create_Period(choose_ai_routine, 0, 5, 1, 5);
+	Task_Create_Period(escape_task, 0, 2, 1, 2);
+	Task_Create_Period(user_ai_task, 0, 2, 1, 3);
+	Task_Create_Period(cruise_task, 0, 2, 1, 4);
+	Task_Create_Period(choose_ai_routine, 0, 2, 1, 5);
 	Task_Create_Period(receive_bt, 0, 3, 1, 0);
-	Task_Create_Period(roomba_task, 0, 20, 1000, 0);
+	Task_Create_Period(roomba_task, 0, 5, 1000, 0);
 	Task_Create_Period(move_switch_task, 0, 6000, 10000, 6000);
+	Task_Create_Period(servo_task, 0, 3, 10, 1);
+	Task_Create_Period(light_sensor_read, 0, 10, 10, 0);
 }
 
 
