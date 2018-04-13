@@ -4,6 +4,7 @@
 #include <pins_arduino.h>
 #include <wiring_private.h>
 #include "UART/usart.h"
+#include <avr/delay.h>
 
 extern void lcd_task();
 
@@ -57,20 +58,21 @@ int analogRead(uint8_t pin) {
 
 void joystick_task() {
 	DDRC &= ~0x01;
-	PORTC |= 0x01;
+	PORTC |= 0x03;
 	for(;;) {
 		sdata.state.sjs_x = analogRead(PIN_A8);
 		sdata.state.sjs_y = analogRead(PIN_A9);
 		sdata.state.rjs_x = analogRead(PIN_A10);
 		sdata.state.rjs_y = analogRead(PIN_A11);
 		sdata.state.sjs_z = (PINC & 0x01) ^ 0x01;
+		sdata.state.rjs_z = ((PINC & 0x02) >> 1) ^ 1;
 		Task_Next();
 	}
 }
 
 void send_bt() {
 	int i;
-	uart1_init(BAUD_CALC(19200));
+	uart1_init(BAUD_CALC(9600));
 	for (;;) {
 		uart1_putc('$');
 		for(i = 0; i < sizeof(struct system_state); i++) {

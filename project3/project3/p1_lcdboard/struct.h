@@ -14,7 +14,6 @@ typedef struct system_state {
 	uint16_t sjs_x;
 	uint16_t sjs_y;
 	uint8_t sjs_z;
-	TICK laser_time;
 };
 
 typedef struct roomba_state {
