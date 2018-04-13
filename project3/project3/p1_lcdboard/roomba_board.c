@@ -189,13 +189,31 @@ void choose_ai_routine() {
 
 void send_bt() {
 	int i;
-	uart1_init(BAUD_CALC(115200));
+	uart1_init(BAUD_CALC(19200));
 	for (;;) {
 		uart1_putc('$');
 		for(i = 0; i < sizeof(struct system_state); i++) {
 			uart1_putc(sdata.data[i]);
 		}
 		Task_Next();
+	}
+}
+
+void receive_bt() {
+	uart1_init(BAUD_CALC(19200));
+	if (uart1_AvailableBytes() > sizeof(struct system_state)){
+		while (uart1_peek() != '$') {
+			if (uart1_AvailableBytes()) {
+				uart1_getc();
+			}
+			else {
+				Task_Next();
+			}
+		}
+		if (uart1_AvailableBytes() > sizeof(struct system_state)) {
+			uart1_getc();
+			uart1_gets(sdata.data, sizeof(struct system_state));
+		}
 	}
 }
 
